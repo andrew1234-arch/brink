@@ -20,9 +20,11 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
 ## Status
 
-**Experiment 00, go / no-go:** ready to run on Kaggle. See [docs/GO_NOGO.md](docs/GO_NOGO.md) and
-`notebooks/kaggle_go_nogo.ipynb`.
+| Experiment | What it tests | Status |
+|---|---|---|
+| [00 go / no-go](docs/GO_NOGO.md) | Fine-tuning breaks Tiny Aya's safety, and the probe signals track it | ready: `notebooks/kaggle_go_nogo.ipynb` |
+| [01 data gate](docs/GATE.md) | The gate finds the (benign-looking) data that erodes safety, before training | ready: `notebooks/kaggle_gate.ipynb` |
 
 ```bash
-python -m pytest tests -q        # offline CPU smoke test of the whole pipeline (tiny random model)
+python -m pytest tests -q        # offline CPU tests of the whole pipeline (tiny random model)
 ```

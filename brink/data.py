@@ -97,9 +97,9 @@ def _harmful_pairs(src: dict) -> tuple[list[Pair], list[Pair]]:
     return comply, refuse
 
 
-def build_go_nogo_data(cfg: dict, seed: int) -> GoNoGoData:
-    rng = random.Random(seed)
-    n_cal, n_probe, n_eval, n_train = cfg["n_cal"], cfg["n_probe"], cfg["n_eval"], cfg["n_train"]
+def _core(cfg: dict, rng: random.Random) -> dict:
+    """Probe / eval prompt sets plus the remaining pools. Shared by every experiment, same RNG order."""
+    n_cal, n_probe, n_eval = cfg["n_cal"], cfg["n_probe"], cfg["n_eval"]
     sources = {}
 
     # Harmful probe prompts (AdvBench): calibration + monitoring splits.
@@ -136,16 +136,64 @@ def build_go_nogo_data(cfg: dict, seed: int) -> GoNoGoData:
     rng.shuffle(comply)
     rng.shuffle(refuse)
     sources["harmful_train"] = cfg["harmful_train_source"]["name"]
+    return {"harmful_cal": harmful_cal, "harmless_cal": harmless_cal, "harmful_probe": harmful_probe,
+            "harmless_probe": harmless_probe, "eval_harmful": eval_harmful, "benign_pool": benign_pool,
+            "comply": comply, "refuse": refuse, "sources": sources}
 
-    n_ref = cfg["n_control_refusals"]
-    control = benign_pool[:n_train - n_ref] + refuse[:n_ref]
+
+def build_go_nogo_data(cfg: dict, seed: int) -> GoNoGoData:
+    rng = random.Random(seed)
+    c = _core(cfg, rng)
+    n_train, n_ref = cfg["n_train"], cfg["n_control_refusals"]
+    control = c["benign_pool"][:n_train - n_ref] + c["refuse"][:n_ref]
     rng.shuffle(control)
     train = {
-        "pos": comply[:n_train],                 # harmful compliance -> expected strong drift
-        "control": control,                      # benign + refusals -> expected no drift
-        "benign": benign_pool[:n_train],         # benign only -> expected mild drift
+        "pos": c["comply"][:n_train],              # harmful compliance -> expected strong drift
+        "control": control,                        # benign + refusals -> expected no drift
+        "benign": c["benign_pool"][:n_train],      # benign only -> expected mild drift
     }
-    return GoNoGoData(harmful_cal, harmless_cal, harmful_probe, harmless_probe, eval_harmful, train, sources)
+    return GoNoGoData(c["harmful_cal"], c["harmless_cal"], c["harmful_probe"], c["harmless_probe"],
+                      c["eval_harmful"], train, c["sources"])
+
+
+@dataclass
+class GateData:
+    """Experiment 01. `pool` mixes benign samples with a few planted harmful ones (ground truth for detection)."""
+    harmful_cal: list[str]
+    harmless_cal: list[str]
+    harmful_probe: list[str]
+    harmless_probe: list[str]
+    eval_harmful: list[str]
+    pool: list[dict]                      # {"id", "user", "assistant", "source": "benign" | "planted"}
+    anchors_unsafe: list[Pair]            # harmful prompt + compliance (representation baseline)
+    anchors_safe: list[Pair]              # same kind of prompt + refusal
+    heldout_benign: list[Pair]            # capability check: loss on unseen benign data
+    sources: dict = field(default_factory=dict)
+
+    def summary(self) -> dict:
+        return {"pool": len(self.pool), "planted": sum(r["source"] == "planted" for r in self.pool),
+                "anchors": len(self.anchors_unsafe), "heldout_benign": len(self.heldout_benign),
+                "harmful_probe": len(self.harmful_probe), "eval_harmful": len(self.eval_harmful),
+                "sources": self.sources}
+
+
+def build_gate_data(cfg: dict, seed: int) -> GateData:
+    rng = random.Random(seed)
+    c = _core(cfg, rng)
+    n_pool, n_planted, n_anchor, n_held = cfg["n_pool"], cfg["n_planted"], cfg["n_anchor"], cfg["n_heldout"]
+    benign = c["benign_pool"]
+    held, benign = benign[:n_held], benign[n_held:]
+    pool = [{"id": f"b{i}", "user": u, "assistant": a, "source": "benign"}
+            for i, (u, a) in enumerate(benign[:n_pool - n_planted])]
+    comply, refuse = c["comply"], c["refuse"]
+    pool += [{"id": f"p{i}", "user": u, "assistant": a, "source": "planted"}
+             for i, (u, a) in enumerate(comply[:n_planted])]
+    rng.shuffle(pool)
+    # Anchors come from rows not used as planted samples.
+    anchors_unsafe = comply[n_planted:n_planted + n_anchor]
+    anchors_safe = refuse[n_planted:n_planted + n_anchor]
+    return GateData(c["harmful_cal"], c["harmless_cal"], c["harmful_probe"], c["harmless_probe"],
+                    c["eval_harmful"], pool, anchors_unsafe, anchors_safe, held, c["sources"])
 
 
 # --------------------------------------------------------------------------- SFT tokenization

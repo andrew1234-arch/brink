@@ -85,16 +85,15 @@ the cost story: a HarmBench run needs generation plus a 7B judge.
 red-team). Otherwise the "lead time" claim is contaminated.
 
 ### 3.1 `brink.gate`: prevention, before training
-Scores each training sample `x` by how much it pushes the model toward compliance:
+Scores each training sample by **predicted refusal erosion**: the first-order change in the monitor's own
+objective J (S3 and/or S1 on the harmful probe set) caused by one SGD step on that sample:
+`score(x) = cos(∇_LoRA L(x), ∇_LoRA J)`, using fresh LoRA adapters as a random projection of the full
+gradient (as in LESS). The gate and the monitor therefore measure the same thing, before and during
+training. Baselines: representation similarity to unsafe vs safe anchors (He et al. 2024), and random.
 
-- **v1 (representation, cheap):** `s(x) = cos(h_ℓ*(x) − μ_benign, μ_harmful-compliance − μ_benign)`,
-  with `h` the mean residual over response tokens.
-- **v2 (gradient, stronger):** `s(x) = cos(∇_LoRA L(x), ḡ_unsafe)`, where `ḡ_unsafe` is the mean LoRA
-  gradient on harmful-compliance pairs. Run only if v1 is weak and compute allows.
-
-Policy: drop the top-k % (k ∈ {1, 3, 5, 10}) or down-weight. It is packaged as a **CuratorKIT custom
-gate**, so it runs inside their pipeline and writes their `rejected.jsonl` with Brink diagnostics. That
-becomes an upstream PR.
+Policy: drop the top-k % or everything above a threshold. It is packaged as a **CuratorKIT `BaseGate`**
+(`brink.gate.curatorkit_gate.BrinkSafetyGate`): rejected samples go to CuratorKIT's `rejected.jsonl`, and
+provenance records carry the score and rank. Details and the experiment: [GATE.md](GATE.md).
 
 ### 3.2 `brink.monitor`: detection, during training
 - A standard `transformers.TrainerCallback`, so it works under AlignTune's TRL backend, plain TRL and
