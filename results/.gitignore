@@ -1,0 +1,6 @@
+# Keep small summaries (csv/json/md) in git; large artifacts go to the Hugging Face Hub.
+*
+!.gitignore
+!*.csv
+!*.json
+!*.md

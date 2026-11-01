@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brink-safety"
+version = "0.0.1"
+description = "Detect and prevent LLM safety collapse during fine-tuning, before it happens."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "torch>=2.0",
+    "transformers",
+    "peft",
+    "datasets",
+    "numpy",
+    "pandas",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+# Lexsi Labs stack, training env (see docs/ARCHITECTURE.md, decision D3)
+lexsi = ["aligntune", "safetune", "auditkit", "curatorkit[all]"]
+# CircuitKIT may need its own env because of its transformers / transformer-lens pins
+circuits = ["circuitkit"]
+demo = ["gradio"]
+dev = ["pytest", "ruff"]
+
+[tool.setuptools.packages.find]
+include = ["brink*"]
