@@ -7,7 +7,7 @@ name = "brink-safety"
 version = "0.0.1"
 description = "Detect and prevent LLM safety collapse during fine-tuning, before it happens."
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.10"
 dependencies = [
     "torch>=2.0",
     "transformers",

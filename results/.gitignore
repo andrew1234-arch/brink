@@ -1,6 +1,9 @@
-# Keep small summaries (csv/json/md) in git; large artifacts go to the Hugging Face Hub.
+# Keep small summaries in git; large artifacts go to the Hugging Face Hub.
+# generations.jsonl (model replies to harmful prompts) and *.pt are deliberately NOT committed.
 *
+!*/
 !.gitignore
 !*.csv
 !*.json
 !*.md
+!*.png

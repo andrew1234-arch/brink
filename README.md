@@ -18,4 +18,11 @@ AuditKIT, CircuitKIT) for the Lexsi AI Safety & Alignment Hackathon 2026.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
-> Status: work in progress.
+## Status
+
+**Experiment 00, go / no-go:** ready to run on Kaggle. See [docs/GO_NOGO.md](docs/GO_NOGO.md) and
+`notebooks/kaggle_go_nogo.ipynb`.
+
+```bash
+python -m pytest tests -q        # offline CPU smoke test of the whole pipeline (tiny random model)
+```

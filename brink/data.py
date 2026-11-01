@@ -1,0 +1,177 @@
+"""Datasets for the go / no-go experiment: probe sets, eval set and fine-tuning conditions.
+
+All splits are disjoint, and every fine-tuning prompt is de-duplicated against the probe and eval
+prompts, so the monitor's signal and the behavioural ground truth can't leak into training.
+"""
+
+from __future__ import annotations
+
+import random
+import re
+from dataclasses import dataclass, field
+
+import torch
+
+from brink.utils import format_conversation
+
+Pair = tuple[str, str]  # (user, assistant)
+
+
+@dataclass
+class GoNoGoData:
+    harmful_cal: list[str]
+    harmless_cal: list[str]
+    harmful_probe: list[str]
+    harmless_probe: list[str]
+    eval_harmful: list[str]
+    train: dict[str, list[Pair]]          # condition -> SFT pairs
+    sources: dict = field(default_factory=dict)
+
+    def summary(self) -> dict:
+        return {
+            "harmful_cal": len(self.harmful_cal), "harmless_cal": len(self.harmless_cal),
+            "harmful_probe": len(self.harmful_probe), "harmless_probe": len(self.harmless_probe),
+            "eval_harmful": len(self.eval_harmful),
+            "train": {k: len(v) for k, v in self.train.items()},
+            "sources": self.sources,
+        }
+
+
+# --------------------------------------------------------------------------- de-duplication
+
+def _norm(s: str) -> list[str]:
+    return re.sub(r"[^a-z0-9 ]+", " ", s.lower()).split()
+
+
+def dedupe_against(items: list, refs: list[str], key=lambda x: x, jaccard: float = 0.7) -> list:
+    """Drop items whose text exactly matches, or heavily overlaps (word Jaccard), any reference."""
+    ref_sets = [set(_norm(r)) for r in refs]
+    ref_exact = {" ".join(_norm(r)) for r in refs}
+    out = []
+    for it in items:
+        toks = _norm(key(it))
+        s = set(toks)
+        if " ".join(toks) in ref_exact:
+            continue
+        if s and any(r and len(s & r) / len(s | r) >= jaccard for r in ref_sets):
+            continue
+        out.append(it)
+    return out
+
+
+# --------------------------------------------------------------------------- HF loading
+
+def _load(src: dict):
+    from datasets import load_dataset
+
+    args = [src["name"]] + ([src["config"]] if src.get("config") else [])
+    return load_dataset(*args, split=src.get("split", "train"))
+
+
+def _col(ds, candidates: list[str]) -> str:
+    for c in candidates:
+        if c in ds.column_names:
+            return c
+    raise KeyError(f"None of {candidates} found in columns {ds.column_names}")
+
+
+def _harmful_prompts(src: dict) -> list[str]:
+    ds = _load(src)
+    col = src.get("column") or _col(ds, ["prompt", "goal", "behavior", "Behavior", "instruction"])
+    return [str(x).strip() for x in ds[col] if str(x).strip()]
+
+
+def _alpaca(src: dict) -> list[Pair]:
+    ds = _load(src)
+    ins, inp, out = _col(ds, ["instruction"]), _col(ds, ["input"]), _col(ds, ["output"])
+    return [(r[ins].strip(), r[out].strip()) for r in ds
+            if not str(r[inp]).strip() and r[ins].strip() and r[out].strip()]
+
+
+def _harmful_pairs(src: dict) -> tuple[list[Pair], list[Pair]]:
+    """LLM-LAT/harmful-dataset: prompt, rejected (harmful compliance), chosen (refusal)."""
+    ds = _load(src)
+    p, bad, good = _col(ds, ["prompt"]), _col(ds, ["rejected"]), _col(ds, ["chosen"])
+    comply = [(r[p].strip(), r[bad].strip()) for r in ds if r[p] and r[bad]]
+    refuse = [(r[p].strip(), r[good].strip()) for r in ds if r[p] and r[good]]
+    return comply, refuse
+
+
+def build_go_nogo_data(cfg: dict, seed: int) -> GoNoGoData:
+    rng = random.Random(seed)
+    n_cal, n_probe, n_eval, n_train = cfg["n_cal"], cfg["n_probe"], cfg["n_eval"], cfg["n_train"]
+    sources = {}
+
+    # Harmful probe prompts (AdvBench): calibration + monitoring splits.
+    harmful = _harmful_prompts(cfg["harmful_probe_source"])
+    rng.shuffle(harmful)
+    harmful_cal, harmful_probe = harmful[:n_cal], harmful[n_cal:n_cal + n_probe]
+    sources["harmful_probe"] = cfg["harmful_probe_source"]["name"]
+
+    # Behavioural eval prompts: HarmBench, falling back to unused AdvBench prompts.
+    try:
+        ev = _harmful_prompts(cfg["eval_source"])
+        ev = dedupe_against(ev, harmful_cal + harmful_probe)
+        rng.shuffle(ev)
+        eval_harmful = ev[:n_eval]
+        sources["eval"] = cfg["eval_source"]["name"]
+    except Exception as e:  # noqa: BLE001
+        print(f"[data] eval source failed ({e!r}); falling back to held-out AdvBench prompts")
+        eval_harmful = harmful[n_cal + n_probe:n_cal + n_probe + n_eval]
+        sources["eval"] = cfg["harmful_probe_source"]["name"] + " (held-out)"
+
+    # Harmless prompts / benign SFT data (Alpaca, no-input rows).
+    alpaca = _alpaca(cfg["harmless_source"])
+    rng.shuffle(alpaca)
+    harmless_cal = [u for u, _ in alpaca[:n_cal]]
+    harmless_probe = [u for u, _ in alpaca[n_cal:n_cal + n_probe]]
+    benign_pool = alpaca[n_cal + n_probe:]
+    sources["harmless"] = cfg["harmless_source"]["name"]
+
+    # Harmful SFT data, de-duplicated against every probe / eval prompt.
+    comply, refuse = _harmful_pairs(cfg["harmful_train_source"])
+    refs = harmful_cal + harmful_probe + eval_harmful
+    comply = dedupe_against(comply, refs, key=lambda x: x[0])
+    refuse = dedupe_against(refuse, refs, key=lambda x: x[0])
+    rng.shuffle(comply)
+    rng.shuffle(refuse)
+    sources["harmful_train"] = cfg["harmful_train_source"]["name"]
+
+    n_ref = cfg["n_control_refusals"]
+    control = benign_pool[:n_train - n_ref] + refuse[:n_ref]
+    rng.shuffle(control)
+    train = {
+        "pos": comply[:n_train],                 # harmful compliance -> expected strong drift
+        "control": control,                      # benign + refusals -> expected no drift
+        "benign": benign_pool[:n_train],         # benign only -> expected mild drift
+    }
+    return GoNoGoData(harmful_cal, harmless_cal, harmful_probe, harmless_probe, eval_harmful, train, sources)
+
+
+# --------------------------------------------------------------------------- SFT tokenization
+
+def tokenize_sft(tok, pairs: list[Pair], max_len: int) -> list[tuple[list[int], list[int]]]:
+    """Chat-format pairs and mask the prompt so loss is only on the assistant's reply."""
+    out = []
+    for user, assistant in pairs:
+        prompt, completion = format_conversation(tok, user, assistant)
+        p_ids = tok(prompt, add_special_tokens=False).input_ids
+        c_ids = tok(completion, add_special_tokens=False).input_ids
+        if len(p_ids) >= max_len - 8:
+            continue
+        ids = (p_ids + c_ids)[:max_len]
+        labels = ([-100] * len(p_ids) + c_ids)[:max_len]
+        out.append((ids, labels))
+    return out
+
+
+def collate(batch: list[tuple[list[int], list[int]]], pad_id: int) -> dict[str, torch.Tensor]:
+    n = max(len(ids) for ids, _ in batch)
+    input_ids = torch.full((len(batch), n), pad_id, dtype=torch.long)
+    labels = torch.full((len(batch), n), -100, dtype=torch.long)
+    attn = torch.zeros((len(batch), n), dtype=torch.long)
+    for i, (ids, lab) in enumerate(batch):
+        input_ids[i, :len(ids)] = torch.tensor(ids)
+        labels[i, :len(lab)] = torch.tensor(lab)
+        attn[i, :len(ids)] = 1
+    return {"input_ids": input_ids, "labels": labels, "attention_mask": attn}

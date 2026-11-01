@@ -154,10 +154,10 @@ Tiny Aya, EN first, then the Gate, then the multilingual slice, then the second 
 
 | # | Decision | Why |
 |---|---|---|
-| D1 | Monitor = plain `TrainerCallback`, plain PyTorch hooks | Toolkits are young (AgentTune has 5 commits; open PRs everywhere). Brink must not break when they do. |
+| D1 | Monitor core is framework-agnostic (`monitor(model, step)`), with a thin `TrainerCallback` adapter; signals use plain PyTorch, not toolkit internals | Toolkits are young (AgentTune has 5 commits; open PRs everywhere). Brink must not break when they do. The go / no-go uses its own loop because HF Trainer would DataParallel across both Kaggle GPUs, and GPU 1 is the judge's. |
 | D2 | CircuitKIT runs **offline, once**, on the base model; components are mapped to HF module names for hooking | CircuitKIT uses TransformerLens, which is too heavy for in-loop use, and Aya support is experimental. |
 | D3 | **Two Python envs** if needed: `train` (AlignTune / SafeTune / CuratorKIT / AuditKIT) and `circuits` (CircuitKIT) | CircuitKIT pins transformers 5 + transformer-lens 3.8.0, and AlignTune's vendored Unsloth caps transformers. They likely conflict. |
-| D4 | Python **3.12** | SafeTune needs ≥ 3.12; CircuitKIT supports ≤ 3.12. |
+| D4 | Core: Python ≥ 3.10 (runs on Kaggle as-is). Full Lexsi stack: **3.12** | SafeTune needs ≥ 3.12; CircuitKIT supports ≤ 3.12. |
 | D5 | Layer `ℓ*` and steering α are fixed at calibration, never auto-picked | SafeTune docs: the auto layer sweep can pick a bad layer, and α is model-specific. |
 | D6 | Detector threshold set on negative controls | Without controls, an always-firing monitor looks perfect. Judges will check this. |
 | D7 | LoRA everywhere | Fits free GPUs, lets the callback probe the live model cheaply, and makes ReSta / rollback cheap. |
