@@ -25,6 +25,8 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 | [00 go / no-go](docs/GO_NOGO.md) | Fine-tuning breaks Tiny Aya's safety, and the probe signals track it | ready: `notebooks/kaggle_go_nogo.ipynb` |
 | [01 data gate](docs/GATE.md) | The gate finds the (benign-looking) data that erodes safety, before training | ready: `notebooks/kaggle_gate.ipynb` |
 
+**Monitor dashboard:** live alarm, signals, ground truth and gate results for any run. See [docs/DASHBOARD.md](docs/DASHBOARD.md).
+
 ```bash
 python -m pytest tests -q        # offline CPU tests of the whole pipeline (tiny random model)
 ```

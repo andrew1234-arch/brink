@@ -130,11 +130,13 @@ Runs on dense checkpoints (every `M` steps) to build the behavioural curve the m
 - Cost: GPU-seconds per probe vs per HarmBench eval.
 - Pareto plot: safety vs capability vs compute for every condition.
 
-### 3.6 `app/`: demo (Gradio on HF Spaces)
-- Replays (or runs live) a fine-tune: signal curves vs step, the CUSUM line, the alarm firing, the
-  repair kicking in.
-- Side-by-side chat: drifted model vs Brink-protected model, same prompts, several languages.
-- Results table plus links to every model / dataset / log on the Hub.
+### 3.6 `app/`: monitor dashboard (Gradio, HF Spaces)
+Built: see [DASHBOARD.md](DASHBOARD.md). It reads any run folder (finished, or still being written) and
+recomputes the alarm from the logs with an adjustable rule (signal, z threshold, persistence, CUSUM). It shows
+status, alarm vs behaviour-break step and lead time, probe-vs-eval cost, the signal curves, the ASR ground
+truth, per-layer erosion, and the gate results. Live mode follows a run as it trains, e.g. from a Kaggle
+notebook with a public share link. It needs no ML stack, so it runs on a free CPU Space. Still to do: a
+side-by-side chat with the drifted vs protected model, which needs a GPU.
 
 ## 4. Experiment matrix
 
