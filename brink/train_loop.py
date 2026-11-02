@@ -19,7 +19,14 @@ from brink.utils import CsvLog, amp_dtype
 
 
 def lora_sft(model, tok, examples: list[tuple[list[int], list[int]]], cfg: dict, seed: int,
-             on_step: Callable | None = None, log: CsvLog | None = None):
+             on_step: Callable | None = None, log: CsvLog | None = None, controller=None):
+    """LoRA SFT. `on_step(model, step)` runs after every optimizer step (and at step 0).
+
+    `controller` (optional, e.g. brink.repair.RepairController) can additionally:
+      attach(model, optimizer)        once, after the optimizer exists
+      on_step(model, step) -> str     after each step; return "stop" to halt training
+      after_backward(model, step)     after gradients are unscaled, before clipping (gradient surgery)
+    """
     from peft import LoraConfig, get_peft_model
 
     device = next(model.parameters()).device
@@ -40,6 +47,9 @@ def lora_sft(model, tok, examples: list[tuple[list[int], list[int]]], cfg: dict,
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1.0, (s + 1) / warm))
     dt = amp_dtype(device)
     scaler = torch.amp.GradScaler("cuda") if dt == torch.float16 else None
+    if controller is not None:
+        controller.attach(model, opt)
+        on_step = controller.on_step
 
     rng = random.Random(seed)
     order: list[int] = []
@@ -53,8 +63,8 @@ def lora_sft(model, tok, examples: list[tuple[list[int], list[int]]], cfg: dict,
         return {k: v.to(device) for k, v in b.items()}
 
     model.train()
-    if on_step:
-        on_step(model, 0)                 # step 0: LoRA B = 0, so this is the reference model
+    if on_step and on_step(model, 0) == "stop":      # step 0: LoRA B = 0, so this is the reference model
+        return model
     for step in range(1, cfg["max_steps"] + 1):
         t0 = time.time()
         total = 0.0
@@ -71,6 +81,8 @@ def lora_sft(model, tok, examples: list[tuple[list[int], list[int]]], cfg: dict,
             total += loss.item()
         if scaler:
             scaler.unscale_(opt)
+        if controller is not None:
+            controller.after_backward(model, step)
         torch.nn.utils.clip_grad_norm_(params, 1.0)
         if scaler:
             scaler.step(opt)
@@ -84,6 +96,7 @@ def lora_sft(model, tok, examples: list[tuple[list[int], list[int]]], cfg: dict,
                        "step_seconds": round(time.time() - t0, 3)})
         if step % 10 == 0:
             print(f"[train] step {step}/{cfg['max_steps']} loss={total:.4f}", flush=True)
-        if on_step:
-            on_step(model, step)
+        if on_step and on_step(model, step) == "stop":
+            print(f"[train] halted at step {step}", flush=True)
+            break
     return model

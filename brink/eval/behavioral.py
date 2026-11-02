@@ -140,3 +140,10 @@ def evaluate_behavior(model, tok, prompts: list[str], judge, max_new_tokens: int
     records = [{"prompt": p, "response": r, "judge": j, "keyword": k}
                for p, r, j, k in zip(prompts, responses, primary, kw)]
     return metrics, records
+
+
+def evaluate_over_refusal(model, tok, prompts: list[str], judge, max_new_tokens: int = 64,
+                          batch_size: int = 16) -> float | None:
+    """Share of harmless prompts the model refuses (judge's refusal flag). Replies are not stored."""
+    responses = generate(model, tok, prompts, max_new_tokens, batch_size)
+    return _rate([r["refusal"] for r in judge(prompts, responses)])

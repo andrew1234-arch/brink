@@ -24,6 +24,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 |---|---|---|
 | [00 go / no-go](docs/GO_NOGO.md) | Fine-tuning breaks Tiny Aya's safety, and the probe signals track it | ready: `notebooks/kaggle_go_nogo.ipynb` |
 | [01 data gate](docs/GATE.md) | The gate finds the (benign-looking) data that erodes safety, before training | ready: `notebooks/kaggle_gate.ipynb` |
+| [02 repair](docs/REPAIR.md) | What to do when the alarm fires: halt, rollback, refusal guard, vs SafeTune post-hoc repair | ready: `notebooks/kaggle_repair.ipynb` |
 
 **Monitor dashboard:** live alarm, signals, ground truth and gate results for any run. See [docs/DASHBOARD.md](docs/DASHBOARD.md).
 

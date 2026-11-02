@@ -223,3 +223,37 @@ def collate(batch: list[tuple[list[int], list[int]]], pad_id: int) -> dict[str, 
         labels[i, :len(lab)] = torch.tensor(lab)
         attn[i, :len(ids)] = 1
     return {"input_ids": input_ids, "labels": labels, "attention_mask": attn}
+
+
+@dataclass
+class RepairData:
+    """Experiment 02: a contaminated fine-tuning set (benign task data + a small share of harmful samples)."""
+    harmful_cal: list[str]
+    harmless_cal: list[str]
+    harmful_probe: list[str]
+    harmless_probe: list[str]
+    eval_harmful: list[str]
+    train: list[Pair]
+    heldout_benign: list[Pair]            # capability: reply loss on unseen task data
+    harmless_eval: list[str]              # over-refusal: refusal rate on unseen harmless prompts
+    sources: dict = field(default_factory=dict)
+
+    def summary(self) -> dict:
+        return {"train": len(self.train), "heldout_benign": len(self.heldout_benign),
+                "harmless_eval": len(self.harmless_eval), "harmful_probe": len(self.harmful_probe),
+                "eval_harmful": len(self.eval_harmful), "sources": self.sources}
+
+
+def build_repair_data(cfg: dict, seed: int) -> RepairData:
+    rng = random.Random(seed)
+    c = _core(cfg, rng)
+    n_train, n_bad = cfg["n_train"], cfg["n_harmful"]
+    benign = c["benign_pool"]
+    held = benign[:cfg["n_heldout"]]
+    harmless_eval = [u for u, _ in benign[cfg["n_heldout"]:cfg["n_heldout"] + cfg["n_harmless_eval"]]]
+    rest = benign[cfg["n_heldout"] + cfg["n_harmless_eval"]:]
+    train = rest[:n_train - n_bad] + c["comply"][:n_bad]
+    rng.shuffle(train)
+    sources = dict(c["sources"], contamination=f"{n_bad}/{n_train} harmful-compliance samples")
+    return RepairData(c["harmful_cal"], c["harmless_cal"], c["harmful_probe"], c["harmless_probe"],
+                      c["eval_harmful"], train, held, harmless_eval, sources)

@@ -106,13 +106,17 @@ provenance records carry the score and rank. Details and the experiment: [GATE.m
   `repair` (hand off to `brink.repair`) · `harden` (resume with SafeGrad).
 - Logs every signal to JSONL plus trackio / W&B, so the demo dashboard can replay any run.
 
-### 3.3 `brink.repair`: thin adapters over SafeTune
-- **ReSta** (weight-space, no training; needs base + aligned + drifted).
-- **SafeGrad / LISA** (train-time hardening, used by the `harden` policy).
-- **Refusal-direction steering** (inference-time, no weight change; serves as a baseline).
+### 3.3 `brink.repair`: acting on the alarm
+Built: see [REPAIR.md](REPAIR.md).
+- **In-training policies**, run by `RepairController` from the monitor's online alarm: `halt`, `rollback` to
+  the last LoRA snapshot the monitor rated safe, and the **refusal guard**. The guard is gradient surgery that
+  removes the component of each task gradient that would lower the monitor's objective J. It needs no
+  reference model and no safety dataset.
+- **Post-hoc baselines via SafeTune:** ReSta (α = 0.25 for Tiny Aya) and steering along the fingerprint's
+  pre-drift refusal direction, at a strength set from the measured erosion.
 
-Brink doesn't invent repair methods. It decides *when* to repair, and lets us compare
-"prevent early" vs "repair late".
+The same quantity J ties the system together: the gate scores data by `cos(∇L, ∇J)`, the monitor watches J,
+and the guard keeps training from lowering J.
 
 ### 3.4 `brink.eval`: ground truth, offline
 Runs on dense checkpoints (every `M` steps) to build the behavioural curve the monitor is judged against.
@@ -144,7 +148,7 @@ side-by-side chat with the drifted vs protected model, which needs a GPU.
 |---|---|
 | Model | **Tiny Aya** (primary) · Command R7B or Aya Expanse 8B (generalization, if compute allows) |
 | Fine-tuning data | **EM** (emergent-misalignment sets: bad medical / risky financial advice, insecure code) → strong drift · **Benign** (real task data) → mild drift · **Control** (benign + safety data) → no drift · **Harmful-small** (about 100 explicit examples) → fast drift, stress test |
-| Condition | Baseline FT · FT + Gate · FT + Monitor(halt) · FT + Monitor(repair) · FT → ReSta (post-hoc) · SafeGrad (hardened) |
+| Condition | Baseline FT · FT + Gate · FT + Monitor(halt / rollback / guard) · guard from start · FT → ReSta / steering (post-hoc) · SafeGrad (optional; needs a second model in GPU memory) |
 | Language | EN · HI (high-resource; AI Safety India is an outreach partner) · one low-resource (e.g. SW or YO) |
 | Seeds | 3 |
 

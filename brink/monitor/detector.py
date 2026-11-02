@@ -7,12 +7,15 @@ from typing import Sequence
 
 def first_alarm(steps: Sequence[int], z: Sequence[float], threshold: float = -3.0,
                 persistence: int = 2) -> int | None:
-    """First step that starts a run of `persistence` consecutive points with z <= threshold."""
+    """Step at which the alarm FIRES: the point that completes a run of `persistence` consecutive z <= threshold.
+
+    This is the earliest step a live monitor could act on, so lead times computed from it are honest.
+    """
     run = 0
     for i, v in enumerate(z):
         run = run + 1 if v is not None and v <= threshold else 0
         if run >= persistence:
-            return int(steps[i - persistence + 1])
+            return int(steps[i])
     return None
 
 

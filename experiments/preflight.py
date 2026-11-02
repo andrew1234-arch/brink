@@ -59,7 +59,10 @@ def main():
             raise RuntimeError("HF_TOKEN missing. Add it as a Kaggle secret.")
     check("HF_TOKEN set", _token)
     check("token valid", lambda: whoami()["name"])
-    for mid in [cfg["model"]["id"]] + ([cfg["judge"]["model_id"]] if cfg["judge"]["kind"] != "keyword" else []):
+    conditions = cfg.get("conditions", [])
+    resta_base = (cfg.get("repair", {}).get("resta", {}) or {}).get("base_id") if "posthoc_resta" in conditions else None
+    for mid in ([cfg["model"]["id"]] + ([cfg["judge"]["model_id"]] if cfg["judge"]["kind"] != "keyword" else [])
+                + ([resta_base] if resta_base else [])):
         def _access(mid=mid):
             try:
                 hf_hub_download(mid, "config.json")
@@ -103,6 +106,18 @@ def main():
                 raise KeyError(f"column {src['column']!r} not in {ds.column_names}")
             return f"{len(ds)} rows, columns {ds.column_names}"
         check(f"{key} = {src['name']}", _ds)
+
+    if any(c.startswith("posthoc_") for c in conditions):
+        print("\n[post-hoc repair]")
+
+        def _safetune():
+            try:
+                import safetune
+            except ImportError as e:
+                raise RuntimeError("safetune not importable (it needs Python >= 3.12). Drop the posthoc_* "
+                                   "conditions, or run them where safetune installs.") from e
+            return getattr(safetune, "__version__", "installed")
+        check("safetune", _safetune)
 
     print("\n[optional]")
     if cfg["judge"]["kind"] != "keyword" and cfg["judge"].get("quant") in ("4bit", "8bit"):

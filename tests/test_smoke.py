@@ -60,7 +60,7 @@ def _data() -> GoNoGoData:
 
 def test_detectors():
     steps = [0, 1, 2, 3, 4, 5]
-    assert first_alarm(steps, [0, -1, -4, -0.5, -4, -5], -3.0, 2) == 4
+    assert first_alarm(steps, [0, -1, -4, -0.5, -4, -5], -3.0, 2) == 5   # fires when the run is confirmed
     assert first_alarm(steps, [0, 0, 0, 0, 0, 0]) is None
     assert cusum_alarm(steps, [0, -2, -2, -2, -2, -2], 0.5, 5.0) == 4
 
