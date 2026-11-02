@@ -8,6 +8,8 @@ Status colors are reserved for state and always ship with a label.
 
 from __future__ import annotations
 
+import re
+
 import plotly.graph_objects as go
 
 from brink.dashboard.metrics import SIGNAL_LABELS, AlarmRule, alarm_step, behaviour_break, z_series
@@ -38,15 +40,23 @@ def _slot(t: dict, i: int) -> str:
     return t["series"][i % len(t["series"])]
 
 
+def _base_name(name: str) -> str:
+    """pos_s1 -> pos (seeds of one condition share its color)."""
+    m = re.fullmatch(r"(.+)_s\d+", name)
+    return m.group(1) if m else name
+
+
 def _cond_color(t: dict, names: list[str], name: str) -> str:
-    """Stable color per condition within a run: by the fixed condition order, not by what's shown."""
-    order = [c for c in CONDITION_ORDER if c in names] + sorted(c for c in names if c not in CONDITION_ORDER)
-    return _slot(t, order.index(name))
+    """Stable color per condition within a run, by the fixed condition order (not by what's shown). All seeds of
+    a condition share its color; the direct labels tell seeds apart."""
+    bases = list(dict.fromkeys(_base_name(n) for n in names))
+    order = [c for c in CONDITION_ORDER if c in bases] + sorted(c for c in bases if c not in CONDITION_ORDER)
+    return _slot(t, order.index(_base_name(name)))
 
 
 def _ordered(conds: list[Condition]) -> list[Condition]:
     rank = {n: i for i, n in enumerate(CONDITION_ORDER)}
-    return sorted(conds, key=lambda c: (rank.get(c.name, len(rank)), c.name))
+    return sorted(conds, key=lambda c: (rank.get(_base_name(c.name), len(rank)), c.name))
 
 
 def _base(t: dict, title: str, y_title: str, height: int = 340) -> go.Figure:

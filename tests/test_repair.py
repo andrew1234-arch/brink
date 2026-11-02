@@ -15,7 +15,7 @@ from brink.data import collate, tokenize_sft
 from brink.gate.scorer import _trainable, objective_terms, wrap_lora_for_scoring
 from brink.monitor.core import Monitor
 from brink.probe import Prober, calibrate
-from brink.repair import RefusalGuard, RepairController, SnapshotBuffer
+from brink.repair import ErosionGuard, RepairController, SnapshotBuffer
 from brink.utils import load_model_and_tokenizer
 from tests.test_smoke import _data, _tiny_model_dir
 
@@ -47,7 +47,7 @@ def _J(model, tok, fp, data):
 def test_projection_removes_only_the_eroding_component(setup):
     d, data, fp, _ = setup
     model, tok = _wrapped(d)
-    guard = RefusalGuard(tok, fp, data.harmful_probe, data.harmless_probe, "S3", batch_size=4)
+    guard = ErosionGuard(tok, fp, data.harmful_probe, data.harmless_probe, "S3", batch_size=4)
     guard.refresh(model, 0)
     params = _trainable(model)
     seen_pos = seen_neg = False
@@ -72,7 +72,7 @@ def test_guarded_step_does_not_erode_J(setup):
     """One SGD step: unguarded lowers J; guarded leaves J unchanged to first order."""
     d, data, fp, _ = setup
     model, tok = _wrapped(d)
-    guard = RefusalGuard(tok, fp, data.harmful_probe, data.harmless_probe, "S3", batch_size=4)
+    guard = ErosionGuard(tok, fp, data.harmful_probe, data.harmless_probe, "S3", batch_size=4)
     guard.refresh(model, 0)
     params = _trainable(model)
     lr, checked = 1e-3, 0
@@ -132,7 +132,7 @@ def test_controller_policies(setup, tmp_path, policy):
     prober = Prober(fp, tok, data.harmful_probe, data.harmless_probe, 4)
     mon = Monitor(prober, tmp_path / policy, probe_every=2, eval_steps=[0, 6], evaluator=None,
                   alarm_signal="S3", alarm_threshold=100.0, alarm_persistence=2)
-    guard = RefusalGuard(tok, fp, data.harmful_probe, data.harmless_probe, "S3", refresh_every=2, batch_size=4)
+    guard = ErosionGuard(tok, fp, data.harmful_probe, data.harmless_probe, "S3", refresh_every=2, batch_size=4)
     ctl = RepairController(mon, policy, guard=guard if "guard" in policy else None)
     cfg = {"max_steps": 6, "lr": 1e-3, "warmup_steps": 1, "micro_batch": 2, "grad_accum": 1, "max_len": 64,
            "lora_r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "grad_ckpt": True}

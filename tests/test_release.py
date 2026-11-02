@@ -52,3 +52,19 @@ def test_hub_refuses_drifted_adapters(tmp_path):
                         "--results", str(_fake_results(tmp_path)), "--adapters", "none"],
                        capture_output=True, text=True)
     assert r.returncode != 0 and "refusing" in (r.stderr + r.stdout)
+
+
+def test_pipeline_layout_and_work_dir(tmp_path):
+    from scripts.publish_hub import collect
+
+    r = _fake_results(tmp_path)
+    for cond in ("naive", "brink"):
+        d = r / "_work" / "pipeline" / "adapters" / cond
+        d.mkdir(parents=True)
+        (d / "adapter_model.safetensors").write_bytes(b"w")
+    (r / "_work" / "pipeline" / "raw.jsonl").write_text('{"instruction": "x"}\n')
+    (r / "_work" / "pipeline" / "manifest.json").write_text("{}")
+    files = collect(r, tmp_path / "stage", ["brink"])
+    assert any("adapters/brink/" in f for f in files)
+    assert not any("/naive/" in f for f in files)               # the unprotected pipeline model stays private
+    assert not any(f.endswith(("raw.jsonl", "manifest.json")) for f in files)

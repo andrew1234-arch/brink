@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import html
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -153,7 +154,12 @@ def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
         return [(label, path) for label, path, _ in out]
 
     def pick_condition(run: Run) -> str | None:
-        return next((c for c in CONDITION_PREF if c in run.conditions), next(iter(run.conditions), None))
+        # Multi-seed runs are named pos_s0, pos_s1, ...: match on the base name.
+        for pref in CONDITION_PREF:
+            for c in sorted(run.conditions):
+                if c == pref or re.fullmatch(rf"{pref}_s\d+", c):
+                    return c
+        return next(iter(run.conditions), None)
 
     def on_run(run_path):
         if not run_path:

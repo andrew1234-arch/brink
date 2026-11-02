@@ -103,3 +103,20 @@ def test_dashboard_needs_no_ml_stack(tmp_path):
     )
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300)
     assert r.returncode == 0, r.stderr[-2000:]
+
+
+def test_multi_seed_runs(tmp_path):
+    from brink.dashboard.figures import _cond_color
+    from brink.dashboard.simulate import simulate_go_nogo
+
+    run_dir = simulate_go_nogo(tmp_path / "sim")
+    for c in ("pos", "control"):                       # rename to the multi-seed layout
+        (run_dir / c).rename(run_dir / f"{c}_s0")
+    sys.path.insert(0, str(ROOT / "app"))
+    import app as dash
+
+    dash.build(tmp_path)                               # builds with seed-suffixed conditions
+    t = F.THEMES["light"]
+    names = ["control_s0", "control_s1", "pos_s0", "pos_s1"]
+    assert _cond_color(t, names, "pos_s0") == _cond_color(t, names, "pos_s1") == t["series"][0]
+    assert _cond_color(t, names, "control_s1") == t["series"][1]

@@ -109,7 +109,7 @@ provenance records carry the score and rank. Details and the experiment: [GATE.m
 ### 3.3 `brink.repair`: acting on the alarm
 Built: see [REPAIR.md](REPAIR.md).
 - **In-training policies**, run by `RepairController` from the monitor's online alarm: `halt`, `rollback` to
-  the last LoRA snapshot the monitor rated safe, and the **refusal guard**. The guard is gradient surgery that
+  the last LoRA snapshot the monitor rated safe, and the **erosion guard**. The guard is gradient surgery that
   removes the component of each task gradient that would lower the monitor's objective J. It needs no
   reference model and no safety dataset.
 - **Post-hoc baselines via SafeTune:** ReSta (α = 0.25 for Tiny Aya) and steering along the fingerprint's

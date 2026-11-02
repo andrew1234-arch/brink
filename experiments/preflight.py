@@ -121,6 +121,31 @@ def main():
                 return f"{n} prompts"
             check(f"{code}: harmless ({cfg['data']['aya_harmless_source']['name']})", _harmless)
 
+    if cfg["data"].get("use_case"):
+        print("\n[pipeline use case]")
+        from brink.data import _aya_harmful, _aya_pairs
+        uc = cfg["data"]["use_case"]
+
+        def _pairs():
+            n = len(_aya_pairs(cfg["data"]["aya_harmless_source"], uc["languages"]))
+            need = uc["n_train"] - uc["n_harmful"] + uc["n_heldout"] + uc["n_harmless_eval"]
+            if n < need:
+                raise RuntimeError(f"only {n} {uc['languages']} pairs, need {need}; lower use_case.n_train")
+            return f"{n} pairs"
+        check(f"task data ({cfg['data']['aya_harmless_source']['name']}, {uc['languages']})", _pairs)
+        check(f"Hindi harmful eval ({uc['redteam_file']})",
+              lambda: f"{len(_aya_harmful(cfg['data']['aya_redteam_source'], uc['redteam_file']))} prompts")
+        check("curatorkit", lambda: __import__("curatorkit").__name__)
+
+        def _aligntune():
+            try:
+                from aligntune.core.backend_factory import create_sft_trainer  # noqa: F401
+                return "importable"
+            except Exception as e:  # noqa: BLE001
+                print(f"  warn AlignTune not importable ({type(e).__name__}); stage 04 will use Brink's loop and say so")
+                return "fallback"
+        check("aligntune", _aligntune)
+
     if any(c.startswith("posthoc_") for c in conditions):
         print("\n[post-hoc repair]")
 

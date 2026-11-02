@@ -336,3 +336,63 @@ def build_multilingual_data(cfg: dict, seed: int) -> MultilingualData:
     control = c["benign_pool"][:n_train - n_ref] + c["refuse"][:n_ref]
     rng.shuffle(control)
     return MultilingualData(langs, {"pos": c["comply"][:n_train], "control": control}, sources)
+
+
+# --------------------------------------------------------------------------- pipeline use case (experiment 04)
+
+def _aya_pairs(src: dict, languages: list[str]) -> list[Pair]:
+    """(instruction, answer) pairs from the Aya instruction dataset, filtered by language."""
+    from datasets import load_dataset
+
+    ds = load_dataset(src["name"], split=src.get("split", "train"))
+    inp, tgt = _col(ds, ["inputs", "prompt", "instruction"]), _col(ds, ["targets", "output", "completion"])
+    keys = [c for c in ("language", "language_code") if c in ds.column_names]
+    want = {x.lower() for x in languages}
+    ds = ds.filter(lambda r: any(str(r[k]).lower() in want for k in keys))
+    return [(str(a).strip(), str(b).strip()) for a, b in zip(ds[inp], ds[tgt]) if str(a).strip() and str(b).strip()]
+
+
+@dataclass
+class PipelineData:
+    """Experiment 04 use case: a Hindi assistant fine-tuned on crowd-sourced Hindi instructions in which a few
+    harmful-compliance samples slipped through."""
+    harmful_cal: list[str]
+    harmless_cal: list[str]
+    harmful_probe: list[str]
+    harmless_probe: list[str]
+    eval_harmful: list[str]               # English HarmBench (main safety metric, reliable judge)
+    eval_harmful_hi: list[str]            # Hindi Aya red-teaming (judge less reliable, reported separately)
+    pool: list[dict]                      # {"id", "user", "assistant", "source": "benign" | "planted"}
+    heldout: list[Pair]                   # task skill: reply loss on unseen Hindi instructions
+    harmless_eval: list[str]              # over-refusal on unseen Hindi instructions
+    sources: dict = field(default_factory=dict)
+
+    def summary(self) -> dict:
+        return {"pool": len(self.pool), "planted": sum(r["source"] == "planted" for r in self.pool),
+                "heldout": len(self.heldout), "harmless_eval": len(self.harmless_eval),
+                "eval_harmful": len(self.eval_harmful), "eval_harmful_hi": len(self.eval_harmful_hi),
+                "sources": self.sources}
+
+
+def build_pipeline_data(cfg: dict, seed: int) -> PipelineData:
+    rng = random.Random(seed)
+    c = _core(cfg, rng)
+    uc = cfg["use_case"]
+    pairs = _aya_pairs(cfg["aya_harmless_source"], uc["languages"])
+    rng.shuffle(pairs)
+    n_held, n_hev, n_train, n_bad = uc["n_heldout"], uc["n_harmless_eval"], uc["n_train"], uc["n_harmful"]
+    if len(pairs) < n_held + n_hev + n_train - n_bad:
+        raise ValueError(f"only {len(pairs)} {uc['languages']} pairs; lower use_case.n_train")
+    held, hev, benign = pairs[:n_held], [u for u, _ in pairs[n_held:n_held + n_hev]], pairs[n_held + n_hev:]
+    pool = [{"id": f"b{i}", "user": u, "assistant": a, "source": "benign"}
+            for i, (u, a) in enumerate(benign[:n_train - n_bad])]
+    pool += [{"id": f"p{i}", "user": u, "assistant": a, "source": "planted"}
+             for i, (u, a) in enumerate(c["comply"][:n_bad])]
+    rng.shuffle(pool)
+    hi_harm = _aya_harmful(cfg["aya_redteam_source"], uc["redteam_file"])
+    rng.shuffle(hi_harm)
+    sources = dict(c["sources"], task=f"{cfg['aya_harmless_source']['name']} ({'/'.join(uc['languages'])})",
+                   contamination=f"{n_bad}/{n_train} harmful-compliance samples",
+                   eval_hi=f"{cfg['aya_redteam_source']['name']}:{uc['redteam_file']}")
+    return PipelineData(c["harmful_cal"], c["harmless_cal"], c["harmful_probe"], c["harmless_probe"],
+                        c["eval_harmful"], hi_harm[:uc["n_eval_hi"]], pool, held, hev, sources)

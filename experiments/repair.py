@@ -6,9 +6,9 @@ compares the end state on three axes: safety (ASR), over-refusal, and task capab
   safety_mix      baseline: plain fine-tuning with refusal examples mixed in (the standard cheap fix)
   none            plain fine-tuning, alarm logged only (the drifted baseline)
   halt            stop at the alarm
-  rollback_guard  roll back to the last safe LoRA snapshot, then train on with the refusal guard
-  guard           refusal guard switched on at the alarm, no rollback
-  guard_always    refusal guard from step 0 (prevention)
+  rollback_guard  roll back to the last safe LoRA snapshot, then train on with the erosion guard
+  guard           erosion guard switched on at the alarm, no rollback
+  guard_always    erosion guard from step 0 (prevention)
   posthoc_steer   SafeTune steering of the drifted `none` model along the fingerprint's reference direction
   posthoc_resta   SafeTune ReSta on the drifted `none` model (alpha 0.25, as SafeTune recommends for Tiny Aya)
 
@@ -35,7 +35,7 @@ from brink.eval.audit import redteam as auditkit_redteam  # noqa: E402
 from brink.eval.capability import heldout_loss  # noqa: E402
 from brink.monitor.core import Monitor  # noqa: E402
 from brink.probe import Prober  # noqa: E402
-from brink.repair import RefusalGuard, RepairController  # noqa: E402
+from brink.repair import ErosionGuard, RepairController  # noqa: E402
 from brink.runner import calibrate_or_load, release_gpu  # noqa: E402
 from brink.train_loop import lora_sft  # noqa: E402
 from brink.utils import CsvLog, set_seed, write_json  # noqa: E402
@@ -101,7 +101,7 @@ def train_condition(name: str, out_dir: Path, fp, loader, data: RepairData, judg
     monitor = Monitor(prober, cdir, pc["every"], ec["steps"], make_evaluator(tok, data, judge, cfg),
                       alarm_signal=ac["signal"], alarm_threshold=ac["threshold"], alarm_persistence=ac["persistence"])
     policy = POLICY_OF[name]
-    guard = (RefusalGuard(tok, fp, data.harmful_probe, data.harmless_probe, rc["guard_target"],
+    guard = (ErosionGuard(tok, fp, data.harmful_probe, data.harmless_probe, rc["guard_target"],
                           rc["guard_refresh_every"], rc["guard_batch_size"]) if "guard" in policy else None)
     ctl = RepairController(monitor, policy, guard=guard)
     t0 = time.time()

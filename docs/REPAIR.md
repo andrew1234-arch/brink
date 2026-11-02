@@ -10,13 +10,13 @@ action *during* training, and benchmarks that against repairing the damage *afte
 | `log` | Nothing; the alarm is recorded (study mode) | none |
 | `halt` | Training stops; a final eval runs at that step | lost task progress |
 | `rollback` | LoRA weights go back to the last state the monitor rated safe; optimizer state resets; training continues | a few hundred MB of CPU RAM for snapshots |
-| `guard` | The **refusal guard** switches on for the rest of training | one J-gradient every N steps |
+| `guard` | The **erosion guard** switches on for the rest of training | one J-gradient every N steps |
 | `rollback_guard` | Rollback, then guard | both |
 | `guard_always` | Guard from step 0 (prevention); the alarm is still logged | guard cost for the whole run |
 
 The step-0 state (LoRA B = 0, the reference model) is always kept as a safe rollback floor.
 
-### The refusal guard
+### The erosion guard
 
 An optimizer step moves the parameters by about `−lr·g`, which changes the refusal objective J by about
 `−lr·⟨g, ∇J⟩`. When that inner product is positive, the step would erode refusal, so the guard removes exactly

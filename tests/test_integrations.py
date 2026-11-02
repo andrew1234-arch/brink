@@ -15,7 +15,7 @@ from brink.data import collate, tokenize_sft
 from brink.monitor.callback import BrinkCallback, attach_to_aligntune
 from brink.monitor.core import Monitor
 from brink.probe import Prober, calibrate
-from brink.repair import RefusalGuard, RepairController
+from brink.repair import ErosionGuard, RepairController
 from brink.utils import load_model_and_tokenizer
 from tests.test_smoke import _data, _tiny_model_dir
 
@@ -76,7 +76,7 @@ def test_policies_under_hf_trainer(setup, tmp_path, policy):
     d, data, fp = setup
     _, tok = load_model_and_tokenizer(str(d), torch.device("cpu"))
     mon = _monitor(fp, tok, data, tmp_path / policy, 100.0)       # +100: alarm fires at the 2nd probe
-    guard = RefusalGuard(tok, fp, data.harmful_probe, data.harmless_probe, "S3", refresh_every=2, batch_size=4)
+    guard = ErosionGuard(tok, fp, data.harmful_probe, data.harmless_probe, "S3", refresh_every=2, batch_size=4)
     ctl = RepairController(mon, policy, guard=guard if "guard" in policy else None)
     tr, _ = _trainer(d, data, tmp_path / "t", BrinkCallback(controller=ctl))
     tr.train()

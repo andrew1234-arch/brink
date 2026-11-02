@@ -1,4 +1,4 @@
-"""Refusal guard: gradient surgery against the monitor's own refusal objective J.
+"""Erosion guard: gradient surgery against the monitor's own refusal objective J.
 
 An optimizer step moves the parameters by about -lr * g, which changes J by about -lr * <g, grad J>. When
 <g, grad J> > 0 the step would erode refusal, so the guard removes that component:
@@ -22,7 +22,7 @@ import torch
 from brink.gate.scorer import objective_gradient
 
 
-class RefusalGuard:
+class ErosionGuard:
     def __init__(self, tok, fp, harmful: list[str], harmless: list[str], target: str = "S3",
                  refresh_every: int = 8, batch_size: int = 2):
         self.tok, self.fp, self.harmful, self.harmless = tok, fp, harmful, harmless

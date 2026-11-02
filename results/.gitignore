@@ -9,3 +9,5 @@
 !*.png
 # Drifted LoRA adapters (repair experiment) never go to git, not even their config.
 **/adapter/
+# Working files of the pipeline experiment (curated data, AlignTune outputs, adapters): never committed.
+_work/

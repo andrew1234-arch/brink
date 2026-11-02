@@ -14,6 +14,14 @@ Fine-tuning a safe model, even on mostly benign data, quietly erodes its refusal
 afterwards, with an expensive behavioural eval, and repair it after the fact. By then compute is spent and the
 damage is baked in.
 
+## Positioning (read first)
+
+Refusal-direction drift during fine-tuning, and filtering safety-eroding data, are both established in prior
+work (Du et al. 2025 ProCon; RefusalGuard 2026; He et al. 2024; see [RELATED_WORK.md](RELATED_WORK.md)). Brink
+doesn't claim those observations. It claims a **working, honestly evaluated system**: one calibrated refusal
+objective that gates data, raises a validated live alarm, and repairs training, measured against the standard
+fixes and shipped as drop-in parts of the Lexsi stack.
+
 ## The idea: one quantity, three jobs
 
 Brink measures **J**, the model's refusal objective: the refusal-vs-compliance log-odds on a fixed probe set,
@@ -23,7 +31,7 @@ calibrated against the model before fine-tuning (its *fingerprint*).
 |---|---|---|---|
 | Before training | **Gate** | Scores each sample by `cos(∇L, ∇J)`: how much training on it would lower J | CuratorKIT (native `BaseGate`) |
 | During training | **Monitor** | Probes J every few steps (one forward pass) and raises a calibrated alarm | AlignTune / HF Trainer callback |
-| On alarm | **Repair** | Rollback to the last safe state, then the **refusal guard**: project each task gradient so it can't lower J | compared with SafeTune ReSta and steering |
+| On alarm | **Repair** | Rollback to the last safe state, then the **erosion guard**: project each task gradient so it can't lower J | compared with SafeTune ReSta and steering |
 | After training | **Verify** | Held-out ASR (WildGuard), over-refusal, task loss, red-team | AuditKIT red-team probes |
 
 **Why it's sound:**
@@ -36,10 +44,11 @@ calibrated against the model before fine-tuning (its *fingerprint*).
 
 | Claim | Experiment | Result |
 |---|---|---|
-| Drift is predictable: the monitor fires before behaviour breaks | 00 go / no-go | lead ⟦RESULT⟧ steps; probe ⟦RESULT⟧× cheaper than an eval; false alarms on safe fine-tuning ⟦RESULT⟧ |
-| Drift is preventable: the gate finds the data that causes it | 01 gate | planted-sample AUROC ⟦RESULT⟧; ASR top / random / bottom ⟦RESULT⟧ |
-| Repair in training beats repair after | 02 repair | ASR none → best policy ⟦RESULT⟧ at held-out loss ⟦RESULT⟧; vs ReSta ⟦RESULT⟧, steering ⟦RESULT⟧ |
-| Safety erodes across languages, and English-only monitoring misses it | 03 multilingual | first language to break ⟦RESULT⟧; English-only vs worst-language lead ⟦RESULT⟧ |
+| The alarm fires before behaviour breaks, without false alarms on safe fine-tuning | 00 go / no-go, 3 seeds | lead ⟦RESULT⟧ ± ⟦RESULT⟧ steps (mechanistic signal ⟦RESULT⟧ vs proxy S3 ⟦RESULT⟧); leave-one-seed-out false alarms ⟦RESULT⟧; vs cheap judge: lead ⟦RESULT⟧, cost ⟦RESULT⟧× |
+| The gate finds risk a content filter can't | 01 gate | AUROC gate ⟦RESULT⟧ vs WildGuard ⟦RESULT⟧; classifier flags ⟦RESULT⟧ of the gate's top benign subset; ASR top / random / bottom ⟦RESULT⟧ |
+| Repairing in training beats the standard fixes | 02 repair | ASR none ⟦RESULT⟧ → rollback + guard ⟦RESULT⟧ at task loss ⟦RESULT⟧; safety-mix ⟦RESULT⟧, ReSta ⟦RESULT⟧, steering ⟦RESULT⟧ |
+| Safety erodes across languages; English-only monitoring lags | 03 multilingual | first language to break ⟦RESULT⟧; English-only vs worst-language lead ⟦RESULT⟧ |
+| The Lexsi pipeline ships a safe, useful model | 04 pipeline (Hindi assistant) | task loss naive ⟦RESULT⟧ vs Brink ⟦RESULT⟧; ASR naive ⟦RESULT⟧ vs Brink ⟦RESULT⟧; contamination caught by the gate ⟦RESULT⟧ |
 
 Lead times are measured at the step the alarm is *confirmed*, so they're what a live monitor could act on.
 
@@ -65,6 +74,7 @@ Lead times are measured at the step the alarm is *confirmed*, so they're what a 
 - WildGuard is mostly English-trained, so non-English ASR is less reliable. The per-language S3 alarm is
   judge-free.
 - CircuitKIT (the circuit-level signal S4) isn't integrated yet. Aya support there is experimental.
+- ProCon-style anchoring, the closest published method to the guard, isn't among the baselines yet.
 - SafeGrad is excluded from the default comparison: its reference model doesn't fit next to the policy
   model on a T4.
 
@@ -84,7 +94,7 @@ Lead times are measured at the step the alarm is *confirmed*, so they're what a 
 4. **(60 s) It doesn't have to happen.**
    - Gate tab: planted harmful samples score at the top.
    - The benign samples the gate flags break safety faster than random ones.
-5. **(60 s) Repair while training.** Run 02 trade-off plot: the refusal guard against no repair, ReSta and
+5. **(60 s) Repair while training.** Run 02 trade-off plot: the erosion guard against no repair, ReSta and
    steering, on safety and task loss.
 6. **(30 s) Beyond English.** Run 03: which language breaks first, and how much earlier the worst-language
    alarm fires.

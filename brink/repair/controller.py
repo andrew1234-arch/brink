@@ -4,7 +4,7 @@ Policies:
   log             record the alarm only (study mode)
   halt            stop training at the alarm (and run a final eval there)
   rollback        restore the last safe LoRA snapshot, reset optimizer state, keep training
-  guard           switch on the refusal guard (gradient surgery against J) from the alarm onwards
+  guard           switch on the erosion guard (gradient surgery against J) from the alarm onwards
   rollback_guard  rollback, then guard
   guard_always    guard from step 0 (prevention; the alarm is still logged)
 """
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import torch
 
-from brink.repair.guard import RefusalGuard
+from brink.repair.guard import ErosionGuard
 
 POLICIES = ("log", "halt", "rollback", "guard", "rollback_guard", "guard_always")
 
@@ -44,12 +44,12 @@ class SnapshotBuffer:
 
 
 class RepairController:
-    def __init__(self, monitor, policy: str = "log", guard: RefusalGuard | None = None,
+    def __init__(self, monitor, policy: str = "log", guard: ErosionGuard | None = None,
                  snapshots: SnapshotBuffer | None = None):
         if policy not in POLICIES:
             raise ValueError(f"policy must be one of {POLICIES}, got {policy!r}")
         if "guard" in policy and guard is None:
-            raise ValueError(f"policy {policy!r} needs a RefusalGuard")
+            raise ValueError(f"policy {policy!r} needs a ErosionGuard")
         if not monitor.alarm_signal and policy not in ("log", "guard_always"):
             raise ValueError("the monitor needs alarm_signal set for alarm-triggered policies")
         self.monitor, self.policy, self.guard = monitor, policy, guard
@@ -88,7 +88,7 @@ class RepairController:
             self.monitor(model, step, force_probe=True)         # confirm the restored state
         if fired and self.policy in ("guard", "rollback_guard"):
             self.guard.active = True
-            self.monitor.log_event(step, "guard_on", f"refusal guard on (target {self.guard.target})")
+            self.monitor.log_event(step, "guard_on", f"erosion guard on (target {self.guard.target})")
         if self.guard is not None and self.guard.active:
             self.guard.maybe_refresh(model, step)
         return None
