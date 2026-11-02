@@ -244,5 +244,9 @@ def test_repair_experiment_end_to_end(tmp_path):
     assert s["conditions"]["posthoc_resta"]["alpha"] == 0.25
     for f in ["REPORT.md", "summary.json", "repair.png", "none/adapter/adapter_config.json", "halt/events.csv"]:
         assert (out / f).exists(), f
+    import json as _json
+    rt = _json.loads((out / "rollback_guard" / "redteam.json").read_text())
+    assert rt["redteam_n"] == 26 and 0 <= rt["redteam_attack_resistance"] <= 1
+    assert "AuditKIT attacks resisted" in (out / "REPORT.md").read_text()
     header = (out / "none" / "evals.csv").read_text().splitlines()[0]
     assert "over_refusal" in header and "heldout_loss" in header

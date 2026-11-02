@@ -18,10 +18,13 @@ def _cond(out_dir: Path, name: str) -> dict | None:
     ev = read_csv(d / "evals.csv")
     last = ev[-1]
     info = json.loads((d / "repair.json").read_text()) if (d / "repair.json").exists() else {}
+    rt = json.loads((d / "redteam.json").read_text()) if (d / "redteam.json").exists() else {}
     train = read_csv(d / "train.csv") if (d / "train.csv").exists() else []
     return {"asr": last.get("asr"), "over_refusal": last.get("over_refusal"), "heldout_loss": last.get("heldout_loss"),
             "asr0": ev[0].get("asr"), "over_refusal0": ev[0].get("over_refusal"), "loss0": ev[0].get("heldout_loss"),
-            "steps_trained": int(train[-1]["step"]) if train else None, "final_step": int(last["step"]), **info}
+            "steps_trained": int(train[-1]["step"]) if train else None, "final_step": int(last["step"]),
+            "attack_resistance": rt.get("redteam_attack_resistance"), "benign_answered": rt.get("redteam_refusal"),
+            **info}
 
 
 def analyze(out_dir: Path, conditions: list[str], cfg: dict) -> dict:
@@ -74,8 +77,9 @@ def _report(s: dict) -> str:
     L += [f"- {'✅' if v else '❌'} {k}" for k, v in s["checks"].items()]
     if s["best_policy"]:
         L += ["", f"Best Brink policy: **{s['best_policy']}**"]
-    L += ["", "| condition | ASR start → end | over-refusal start → end | held-out loss start → end | steps trained | alarm | notes |",
-          "|---|---|---|---|---|---|---|"]
+    L += ["", "| condition | ASR start → end | over-refusal start → end | held-out loss start → end | "
+             "AuditKIT attacks resisted | AuditKIT benign answered | steps trained | alarm | notes |",
+          "|---|---|---|---|---|---|---|---|---|"]
     for c, r in s["conditions"].items():
         if not r:
             continue
@@ -93,7 +97,8 @@ def _report(s: dict) -> str:
         if r.get("starts_from"):
             notes.append(f"start = {r['starts_from']}")
         L.append(f"| {c} | {_f(r['asr0'], 1)} → {_f(r['asr'], 1)} | {_f(r['over_refusal0'], 1)} → {_f(r['over_refusal'], 1)} | "
-                 f"{_f(r['loss0'])} → {_f(r['heldout_loss'])} | {_f(r.get('steps_trained'))} | {_f(r.get('alarm_step'))} | "
+                 f"{_f(r['loss0'])} → {_f(r['heldout_loss'])} | {_f(r.get('attack_resistance'), 1)} | "
+                 f"{_f(r.get('benign_answered'), 1)} | {_f(r.get('steps_trained'))} | {_f(r.get('alarm_step'))} | "
                  f"{'; '.join(notes)} |")
     return "\n".join(L) + "\n"
 

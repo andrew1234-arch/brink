@@ -26,3 +26,6 @@ wandb/
 *.pt
 *.ckpt
 hf_cache/
+
+# Local build output
+build/

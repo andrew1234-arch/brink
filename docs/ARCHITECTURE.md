@@ -142,6 +142,16 @@ truth, per-layer erosion, and the gate results. Live mode follows a run as it tr
 notebook with a public share link. It needs no ML stack, so it runs on a free CPU Space. Still to do: a
 side-by-side chat with the drifted vs protected model, which needs a GPU.
 
+### 3.7 Integrations (built)
+- **Hugging Face Trainer / TRL:** `BrinkCallback` runs the monitor on `on_step_end`, the guard on
+  `on_pre_optimizer_step`, and halts via `control.should_training_stop`. Tested under `transformers.Trainer`.
+- **AlignTune:** its callback adapter passes no step or control to AlignTune callbacks (see
+  [UPSTREAM.md](UPSTREAM.md)), so `attach_to_aligntune` adds Brink to the HF trainer AlignTune builds.
+- **AuditKIT:** red-team probes on every final model in experiment 02, reported per family. Attack
+  resistance and over-refusal are kept separate.
+- **Multilingual:** per-language fingerprints and a worst-language alarm (experiment 03,
+  [MULTILINGUAL.md](MULTILINGUAL.md)).
+
 ## 4. Experiment matrix
 
 | Axis | Values |

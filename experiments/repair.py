@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from brink.analysis.repair import analyze  # noqa: E402
 from brink.data import RepairData, build_repair_data, tokenize_sft  # noqa: E402
 from brink.eval.behavioral import evaluate_behavior, evaluate_over_refusal, make_judge  # noqa: E402
+from brink.eval.audit import redteam as auditkit_redteam  # noqa: E402
 from brink.eval.capability import heldout_loss  # noqa: E402
 from brink.monitor.core import Monitor  # noqa: E402
 from brink.probe import Prober  # noqa: E402
@@ -55,6 +56,18 @@ def make_evaluator(tok, data: RepairData, judge, cfg: dict):
     return evaluator
 
 
+def final_redteam(model, tok, cdir: Path, cfg: dict) -> None:
+    """AuditKIT red-team probes on the final model, if enabled and installed."""
+    if not cfg["eval"].get("redteam", True):
+        return
+    try:
+        res = auditkit_redteam(model, tok, max_new_tokens=cfg["eval"]["max_new_tokens"],
+                               batch_size=cfg["eval"]["batch_size"])
+    except ImportError:
+        res = {"skipped": "auditkit not installed"}
+    write_json(cdir / "redteam.json", res)
+
+
 def train_condition(name: str, out_dir: Path, fp, loader, data: RepairData, judge, cfg: dict, seed: int) -> None:
     cdir = out_dir / name
     if (cdir / "DONE").exists():
@@ -76,8 +89,10 @@ def train_condition(name: str, out_dir: Path, fp, loader, data: RepairData, judg
                      log=CsvLog(cdir / "train.csv"), controller=ctl)
     summary = {**ctl.summary(), "train_seconds": round(time.time() - t0, 1)}
     write_json(cdir / "repair.json", summary)
-    if name == "none":
-        model.save_pretrained(str(cdir / "adapter"))          # drifted adapter: for post-hoc repair only
+    final_redteam(model, tok, cdir, cfg)
+    # Adapters stay local (git-ignored). `none` is the drifted model the post-hoc conditions repair; the
+    # Brink-protected ones can be published with scripts/publish_hub.py --adapters <condition>.
+    model.save_pretrained(str(cdir / "adapter"))
     (cdir / "DONE").write_text("ok\n")
     del model, monitor, prober, ctl, guard
     release_gpu()
@@ -107,6 +122,7 @@ def posthoc_condition(name: str, out_dir: Path, fp, loader, data: RepairData, ju
         with ReferenceSteer(model, fp, strength):
             sig = prober(model)
             metrics, _ = evaluator(model)
+            final_redteam(model, tok, cdir, cfg)
     elif name == "posthoc_resta":
         rs = rc["resta"]
         model = resta(model, rs["base_id"], rs.get("aligned_id") or cfg["model"]["id"], alpha=rs["alpha"],
@@ -114,6 +130,7 @@ def posthoc_condition(name: str, out_dir: Path, fp, loader, data: RepairData, ju
         info.update(alpha=rs["alpha"], base_id=rs["base_id"])
         sig = prober(model)
         metrics, _ = evaluator(model)
+        final_redteam(model, tok, cdir, cfg)
     else:
         raise ValueError(name)
     info["repair_seconds"] = round(time.time() - t0, 1)

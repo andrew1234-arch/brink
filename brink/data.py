@@ -257,3 +257,73 @@ def build_repair_data(cfg: dict, seed: int) -> RepairData:
     sources = dict(c["sources"], contamination=f"{n_bad}/{n_train} harmful-compliance samples")
     return RepairData(c["harmful_cal"], c["harmless_cal"], c["harmful_probe"], c["harmless_probe"],
                       c["eval_harmful"], train, held, harmless_eval, sources)
+
+
+# --------------------------------------------------------------------------- multilingual (experiment 03)
+
+@dataclass
+class LangSets:
+    harmful_cal: list[str]
+    harmless_cal: list[str]
+    harmful_probe: list[str]
+    harmless_probe: list[str]
+    eval_harmful: list[str]
+
+
+@dataclass
+class MultilingualData:
+    langs: dict[str, LangSets]            # first key is the primary language (English)
+    train: dict[str, list[Pair]]
+    sources: dict = field(default_factory=dict)
+
+    def summary(self) -> dict:
+        return {"langs": {k: {f: len(getattr(v, f)) for f in ("harmful_cal", "harmful_probe", "eval_harmful",
+                                                               "harmless_cal", "harmless_probe")}
+                          for k, v in self.langs.items()},
+                "train": {k: len(v) for k, v in self.train.items()}, "sources": self.sources}
+
+
+def _aya_harmful(src: dict, file: str) -> list[str]:
+    from datasets import load_dataset
+
+    ds = load_dataset(src["name"], data_files=file, split="train")
+    col = _col(ds, ["prompt", "text", "inputs"])
+    return [str(x).strip() for x in ds[col] if str(x).strip()]
+
+
+def _aya_harmless(src: dict, languages: list[str]) -> list[str]:
+    from datasets import load_dataset
+
+    ds = load_dataset(src["name"], split=src.get("split", "train"))
+    inp = _col(ds, ["inputs", "prompt", "instruction"])
+    keys = [c for c in ("language", "language_code") if c in ds.column_names]
+    want = {x.lower() for x in languages}
+    ds = ds.filter(lambda r: any(str(r[k]).lower() in want for k in keys))
+    return [str(x).strip() for x in ds[inp] if str(x).strip()]
+
+
+def build_multilingual_data(cfg: dict, seed: int) -> MultilingualData:
+    """English sets exactly as in go / no-go; other languages from Aya red-teaming (harmful) and the Aya
+    instruction dataset (harmless). Training data stays English: the question is whether safety erodes
+    differently in languages the fine-tuning never touched."""
+    rng = random.Random(seed)
+    c = _core(cfg, rng)
+    langs = {"en": LangSets(c["harmful_cal"], c["harmless_cal"], c["harmful_probe"], c["harmless_probe"],
+                            c["eval_harmful"])}
+    n_cal, n_probe, n_eval = cfg["ml_n_cal"], cfg["ml_n_probe"], cfg["ml_n_eval"]
+    sources = dict(c["sources"])
+    for code, lc in cfg["languages"].items():
+        harmful = _aya_harmful(cfg["aya_redteam_source"], lc["redteam_file"])
+        harmless = _aya_harmless(cfg["aya_harmless_source"], lc["aya_dataset_languages"])
+        rng.shuffle(harmful)
+        rng.shuffle(harmless)
+        need = 2 * n_cal + 2 * n_probe + n_eval
+        if len(harmful) < n_cal + n_probe + n_eval or len(harmless) < n_cal + n_probe:
+            raise ValueError(f"[{code}] not enough prompts: {len(harmful)} harmful, {len(harmless)} harmless (need ~{need})")
+        langs[code] = LangSets(harmful[:n_cal], harmless[:n_cal], harmful[n_cal:n_cal + n_probe],
+                               harmless[n_cal:n_cal + n_probe], harmful[n_cal + n_probe:n_cal + n_probe + n_eval])
+        sources[code] = f"{cfg['aya_redteam_source']['name']}:{lc['redteam_file']} + {cfg['aya_harmless_source']['name']}"
+    n_train, n_ref = cfg["n_train"], cfg["n_control_refusals"]
+    control = c["benign_pool"][:n_train - n_ref] + c["refuse"][:n_ref]
+    rng.shuffle(control)
+    return MultilingualData(langs, {"pos": c["comply"][:n_train], "control": control}, sources)

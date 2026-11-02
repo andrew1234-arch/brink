@@ -47,6 +47,7 @@ eval:
   over_refusal_max_new_tokens: 64
   batch_size: 16
   loss_batch_size: 4
+  redteam: true            # AuditKIT red-team probes on every final model (26 prompts)
 
 judge:
   kind: auto

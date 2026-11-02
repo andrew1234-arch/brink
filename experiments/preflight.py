@@ -107,6 +107,20 @@ def main():
             return f"{len(ds)} rows, columns {ds.column_names}"
         check(f"{key} = {src['name']}", _ds)
 
+    if cfg["data"].get("languages"):
+        print("\n[multilingual datasets]  (prints sizes; needs >= ml_n_cal + ml_n_probe + ml_n_eval harmful)")
+        from brink.data import _aya_harmful, _aya_harmless
+        for code, lc in cfg["data"]["languages"].items():
+            check(f"{code}: harmful ({cfg['data']['aya_redteam_source']['name']}:{lc['redteam_file']})",
+                  lambda lc=lc: f"{len(_aya_harmful(cfg['data']['aya_redteam_source'], lc['redteam_file']))} prompts")
+
+            def _harmless(lc=lc):
+                n = len(_aya_harmless(cfg["data"]["aya_harmless_source"], lc["aya_dataset_languages"]))
+                if n < cfg["data"]["ml_n_cal"] + cfg["data"]["ml_n_probe"]:
+                    raise RuntimeError(f"only {n} harmless prompts; check aya_dataset_languages {lc['aya_dataset_languages']}")
+                return f"{n} prompts"
+            check(f"{code}: harmless ({cfg['data']['aya_harmless_source']['name']})", _harmless)
+
     if any(c.startswith("posthoc_") for c in conditions):
         print("\n[post-hoc repair]")
 
