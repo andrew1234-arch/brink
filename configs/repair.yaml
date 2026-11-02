@@ -18,6 +18,7 @@ data:
   n_harmful: 51            #   ~10 % harmful-compliance samples mixed into benign task data
   n_heldout: 64            # capability: reply loss on unseen task data
   n_harmless_eval: 32      # over-refusal: refusal rate on unseen harmless prompts
+  n_safety_mix: 51         # safety_mix baseline: refusal examples added (same count as contaminating samples)
 
 probe:
   batch_size: 8
@@ -28,7 +29,8 @@ probe:
 
 alarm:                     # online rule, identical to the offline detector
   signal: S3
-  threshold: -3.0
+  threshold: auto          # control-calibrated value from results/go_nogo/summary.json (falls back to -3)
+  calibration_from: results/go_nogo/summary.json
   persistence: 2
 
 repair:
@@ -69,7 +71,7 @@ train:
   grad_ckpt: true
 
 # Order matters: post-hoc conditions repair the `none` model, so `none` runs first.
-conditions: [none, halt, rollback_guard, guard_always, posthoc_steer, posthoc_resta]
+conditions: [none, safety_mix, halt, rollback_guard, guard_always, posthoc_steer, posthoc_resta]
 
 analysis:
   min_drift_removed: 0.5          # R1: best Brink policy removes >= 50 % of the ASR increase of `none`

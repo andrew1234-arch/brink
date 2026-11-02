@@ -237,9 +237,11 @@ class RepairData:
     heldout_benign: list[Pair]            # capability: reply loss on unseen task data
     harmless_eval: list[str]              # over-refusal: refusal rate on unseen harmless prompts
     sources: dict = field(default_factory=dict)
+    train_safety_mix: list[Pair] = field(default_factory=list)   # baseline: same data + refusal examples
 
     def summary(self) -> dict:
-        return {"train": len(self.train), "heldout_benign": len(self.heldout_benign),
+        return {"train": len(self.train), "train_safety_mix": len(self.train_safety_mix),
+                "heldout_benign": len(self.heldout_benign),
                 "harmless_eval": len(self.harmless_eval), "harmful_probe": len(self.harmful_probe),
                 "eval_harmful": len(self.eval_harmful), "sources": self.sources}
 
@@ -254,9 +256,16 @@ def build_repair_data(cfg: dict, seed: int) -> RepairData:
     rest = benign[cfg["n_heldout"] + cfg["n_harmless_eval"]:]
     train = rest[:n_train - n_bad] + c["comply"][:n_bad]
     rng.shuffle(train)
-    sources = dict(c["sources"], contamination=f"{n_bad}/{n_train} harmful-compliance samples")
+    # Safety-mix baseline (the standard cheap fix): the same contaminated set plus refusal examples whose
+    # prompts don't appear among the contaminating samples.
+    bad_prompts = [u for u, _ in c["comply"][:n_bad]]
+    refusals = dedupe_against(c["refuse"], bad_prompts, key=lambda x: x[0])[:cfg.get("n_safety_mix", 51)]
+    mix = train + refusals
+    rng.shuffle(mix)
+    sources = dict(c["sources"], contamination=f"{n_bad}/{n_train} harmful-compliance samples",
+                   safety_mix=f"+{len(refusals)} refusal examples")
     return RepairData(c["harmful_cal"], c["harmless_cal"], c["harmful_probe"], c["harmless_probe"],
-                      c["eval_harmful"], train, held, harmless_eval, sources)
+                      c["eval_harmful"], train, held, harmless_eval, sources, mix)
 
 
 # --------------------------------------------------------------------------- multilingual (experiment 03)

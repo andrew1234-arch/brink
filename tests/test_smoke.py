@@ -82,6 +82,7 @@ def test_go_nogo_end_to_end(tmp_path):
     mdir = _tiny_model_dir(tmp_path)
     cfg = yaml.safe_load((ROOT / "configs" / "go_nogo.yaml").read_text())
     cfg["model"]["id"] = str(mdir)
+    cfg["seeds"] = [0]                                  # single-seed layout: pos/, control/
     cfg["probe"].update(batch_size=4, n_tokens=3, bootstrap=20, every=2)
     cfg["eval"].update(steps=[0, 3, 6], max_new_tokens=6, batch_size=4)
     cfg["train"].update(max_steps=6, micro_batch=2, grad_accum=2, max_len=64, lora_r=4, lora_alpha=8)
@@ -109,3 +110,28 @@ def test_go_nogo_end_to_end(tmp_path):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+def test_go_nogo_multi_seed(tmp_path):
+    """Two seeds: runs land in pos_s0 / pos_s1 / control_s*, the analysis evaluates leave-one-seed-out, and the
+    cheap-judge baseline is logged at every probe step."""
+    from brink.utils import load_model_and_tokenizer
+    from experiments.go_nogo import run
+
+    mdir = _tiny_model_dir(tmp_path)
+    cfg = yaml.safe_load((ROOT / "configs" / "go_nogo.yaml").read_text())
+    cfg["model"]["id"] = str(mdir)
+    cfg["seeds"] = [0, 1]
+    cfg["probe"].update(batch_size=4, n_tokens=3, bootstrap=20, every=2)
+    cfg["eval"].update(steps=[0, 3, 6], max_new_tokens=4, batch_size=4, cheap_judge={"n": 4, "max_new_tokens": 4})
+    cfg["train"].update(max_steps=6, micro_batch=2, grad_accum=2, max_len=64, lora_r=4, lora_alpha=8)
+    loader = lambda: load_model_and_tokenizer(str(mdir), torch.device("cpu"))  # noqa: E731
+    s = run(cfg, tmp_path / "out", data=_data(), loader=loader, judge=KeywordJudge())
+    out = tmp_path / "out"
+    for d in ("pos_s0", "pos_s1", "control_s0", "control_s1"):
+        assert (out / d / "DONE").exists(), d
+    assert "cheap_asr" in (out / "pos_s0" / "probe.csv").read_text().splitlines()[0]
+    assert s["seeds"] == [0, 1]
+    assert all(v["evaluation"] == "leave-one-seed-out" for v in s["signals"].values())
+    assert s["cheap_judge_baseline"] is not None
+    assert set(s["calibration"]) >= {"S1", "S3"}

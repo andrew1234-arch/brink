@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from brink.analysis.go_nogo import analyze  # noqa: E402
 from brink.data import GoNoGoData, build_go_nogo_data  # noqa: E402
 from brink.eval.behavioral import make_judge  # noqa: E402
-from brink.runner import calibrate_or_load, run_condition  # noqa: E402
+from brink.runner import calibrate_or_load, run_condition, run_name, seeds_of  # noqa: E402
 from brink.utils import load_model_and_tokenizer, set_seed, write_json  # noqa: E402
 
 
@@ -52,11 +52,13 @@ def run(cfg: dict, out_dir: Path, data: GoNoGoData | None = None, loader=None, j
     fp = calibrate_or_load(out_dir, loader, data, cfg["probe"], seed)
 
     # 2. One fine-tuning run per condition, monitored and evaluated along the way.
-    for cond in cfg["conditions"]:
-        run_condition(cond, data.train[cond], out_dir, fp, loader, data, judge, cfg, seed)
+    # Every condition under every seed (seed = LoRA init + data order; data and fingerprint are shared).
+    for s in seeds_of(cfg):
+        for cond in cfg["conditions"]:
+            run_condition(run_name(cond, s, cfg), data.train[cond], out_dir, fp, loader, data, judge, cfg, s)
 
     # 3. Verdict.
-    summary = analyze(out_dir, cfg["conditions"], cfg["analysis"])
+    summary = analyze(out_dir, cfg["conditions"], cfg["analysis"], seeds_of(cfg))
     summary["wall_minutes"] = round((time.time() - t_start) / 60, 1)
     write_json(out_dir / "summary.json", summary)
     print((out_dir / "REPORT.md").read_text(), flush=True)

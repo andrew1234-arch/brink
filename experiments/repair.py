@@ -3,6 +3,7 @@
 Fine-tunes Tiny Aya on a contaminated dataset (benign task data + 10 % harmful samples) under each policy and
 compares the end state on three axes: safety (ASR), over-refusal, and task capability (held-out loss).
 
+  safety_mix      baseline: plain fine-tuning with refusal examples mixed in (the standard cheap fix)
   none            plain fine-tuning, alarm logged only (the drifted baseline)
   halt            stop at the alarm
   rollback_guard  roll back to the last safe LoRA snapshot, then train on with the refusal guard
@@ -40,7 +41,7 @@ from brink.train_loop import lora_sft  # noqa: E402
 from brink.utils import CsvLog, set_seed, write_json  # noqa: E402
 from experiments.go_nogo import make_loader  # noqa: E402
 
-POLICY_OF = {"none": "log", "halt": "halt", "rollback": "rollback", "guard": "guard",
+POLICY_OF = {"safety_mix": "log", "none": "log", "halt": "halt", "rollback": "rollback", "guard": "guard",
              "rollback_guard": "rollback_guard", "guard_always": "guard_always"}
 
 
@@ -54,6 +55,25 @@ def make_evaluator(tok, data: RepairData, judge, cfg: dict):
         metrics["heldout_loss"] = heldout_loss(m, tok, data.heldout_benign, tc["max_len"], ec.get("loss_batch_size", 4))
         return metrics, records
     return evaluator
+
+
+def resolve_threshold(ac: dict) -> float:
+    """`threshold: auto` takes the control-calibrated threshold from the go / no-go summary, so the repair
+    alarm never uses a number tuned on harmful runs."""
+    import json
+
+    t = ac.get("threshold", -3.0)
+    if t != "auto":
+        return float(t)
+    path = Path(ac.get("calibration_from", "results/go_nogo/summary.json"))
+    try:
+        cal = json.loads(path.read_text())["calibration"][ac["signal"]]
+        print(f"[alarm] using control-calibrated threshold {cal['threshold']:.2f} for {ac['signal']} from {path}",
+              flush=True)
+        return float(cal["threshold"])
+    except (FileNotFoundError, KeyError, json.JSONDecodeError):
+        print(f"[alarm] WARNING: no calibration at {path}; falling back to -3.0. Run go / no-go first.", flush=True)
+        return -3.0
 
 
 def final_redteam(model, tok, cdir: Path, cfg: dict) -> None:
@@ -85,7 +105,10 @@ def train_condition(name: str, out_dir: Path, fp, loader, data: RepairData, judg
                           rc["guard_refresh_every"], rc["guard_batch_size"]) if "guard" in policy else None)
     ctl = RepairController(monitor, policy, guard=guard)
     t0 = time.time()
-    model = lora_sft(model, tok, tokenize_sft(tok, data.train, cfg["train"]["max_len"]), cfg["train"], seed,
+    pairs = data.train_safety_mix if name == "safety_mix" else data.train
+    if not pairs:
+        raise ValueError(f"[{name}] no training pairs (safety_mix needs RepairData.train_safety_mix)")
+    model = lora_sft(model, tok, tokenize_sft(tok, pairs, cfg["train"]["max_len"]), cfg["train"], seed,
                      log=CsvLog(cdir / "train.csv"), controller=ctl)
     summary = {**ctl.summary(), "train_seconds": round(time.time() - t0, 1)}
     write_json(cdir / "repair.json", summary)
@@ -154,6 +177,8 @@ def run(cfg: dict, out_dir: Path, data: RepairData | None = None, loader=None, j
     write_json(out_dir / "data_summary.json", data.summary())
     print(f"[data] {data.summary()}", flush=True)
     fp = calibrate_or_load(out_dir, loader, data, cfg["probe"], seed)
+    cfg["alarm"]["threshold"] = resolve_threshold(cfg["alarm"])
+    write_json(out_dir / "config.json", cfg)
     judge = judge or make_judge(cfg["judge"])
     for cond in cfg["conditions"]:
         if cond in POLICY_OF:

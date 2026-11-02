@@ -33,6 +33,7 @@ gate:
   lora_alpha: 16
   max_len: 1024
   batch_size: 4
+  classifier_baseline: true   # WildGuard over every training pair (needs 2 GPUs)
 
 select:
   k: 256                   # benign samples per fine-tuning subset

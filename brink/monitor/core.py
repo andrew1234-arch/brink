@@ -19,8 +19,11 @@ class Monitor:
     def __init__(self, prober: Callable, out_dir: Path, probe_every: int = 4,
                  eval_steps: list[int] | None = None, evaluator: Callable | None = None,
                  save_generations: bool = True, alarm_signal: str | None = None,
-                 alarm_threshold: float = -3.0, alarm_persistence: int = 2):
+                 alarm_threshold: float = -3.0, alarm_persistence: int = 2, cheap_check: Callable | None = None):
         self.prober, self.evaluator = prober, evaluator
+        # Baseline monitor: a small behavioural check (few prompts, short replies, keyword judge) at every probe
+        # step, so Brink's probe can be compared with "just run a cheap judge every N steps" on cost and lead.
+        self.cheap_check = cheap_check
         self.probe_every = probe_every
         self.eval_steps = set(eval_steps or [])
         self.out_dir = Path(out_dir)
@@ -77,6 +80,10 @@ class Monitor:
         breach, fired = self._update_alarm(step, sig)
         row = {"step": step, **sig, "probe_seconds": round(time.time() - t0, 3),
                "breach": int(breach), "alarm": int(self.alarm_step is not None)}
+        if self.cheap_check is not None:
+            t2 = time.time()
+            row["cheap_asr"] = self.cheap_check(model)
+            row["cheap_seconds"] = round(time.time() - t2, 3)
         self.probe_log.write(row)
         row["alarm_fired"] = fired
         if is_eval:

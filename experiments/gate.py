@@ -32,12 +32,31 @@ from brink.utils import CsvLog, read_csv, set_seed, write_json, write_jsonl  # n
 from experiments.go_nogo import make_loader  # noqa: E402
 
 
-def score_pool(out_dir: Path, data: GateData, fp, loader, gc: dict, seed: int) -> list[str]:
+SCORE_PREFIXES = ("grad_", "rep", "random", "classifier")
+
+
+def classifier_scores(judge, pool: list[dict], batch: int = 64) -> np.ndarray | None:
+    """Baseline gate: a safety classifier (WildGuard) over every training pair; 1 = flagged harmful.
+    The question judges will ask is "why not just filter with a classifier?". This answers it with data."""
+    from brink.eval.behavioral import KeywordJudge
+
+    if judge is None or isinstance(judge, KeywordJudge):
+        print("[gate] classifier baseline skipped: needs WildGuard (2 GPUs)", flush=True)
+        return None
+    out = []
+    for i in range(0, len(pool), batch):
+        chunk = pool[i:i + batch]
+        res = judge([r["user"] for r in chunk], [r["assistant"] for r in chunk])
+        out += [1.0 if r.get("harmful") else 0.0 for r in res]
+    return np.asarray(out)
+
+
+def score_pool(out_dir: Path, data: GateData, fp, loader, gc: dict, seed: int, judge=None) -> list[str]:
     """Write scores.csv (ids, source, scores only; no text) and return the score columns."""
     path = out_dir / "scores.csv"
     if path.exists():
         print("[gate] reusing scores.csv", flush=True)
-        return [k for k in read_csv(path)[0] if k.startswith(("grad_", "rep", "random")) and not k.startswith("grad_dot")
+        return [k for k in read_csv(path)[0] if k.startswith(SCORE_PREFIXES) and not k.startswith("grad_dot")
                 and k != "grad_norm"]
     model, tok = loader()
     t0 = time.time()
@@ -49,7 +68,12 @@ def score_pool(out_dir: Path, data: GateData, fp, loader, gc: dict, seed: int) -
     t_grad = time.time() - t0
     s["rep"] = scorer.rep(pairs, data.anchors_unsafe, data.anchors_safe)
     s["random"] = np.random.default_rng(seed).random(len(pairs))
-    timing = {"grad_seconds": round(t_grad, 1), "rep_seconds": round(time.time() - t0 - t_grad, 1),
+    t_cls = time.time()
+    cls = classifier_scores(judge, data.pool) if gc.get("classifier_baseline", True) else None
+    if cls is not None:
+        s["classifier"] = cls
+    timing = {"grad_seconds": round(t_grad, 1), "rep_seconds": round(t_cls - t0 - t_grad, 1),
+              "classifier_seconds": round(time.time() - t_cls, 1) if cls is not None else None,
               "per_sample_grad_seconds": round(t_grad / len(pairs), 3), "n": len(pairs)}
     write_json(out_dir / "scoring_time.json", timing)
     print(f"[gate] scoring done: {timing}", flush=True)
@@ -61,7 +85,7 @@ def score_pool(out_dir: Path, data: GateData, fp, loader, gc: dict, seed: int) -
     write_jsonl(out_dir / "pool.jsonl", data.pool, mode="w")
     del model, scorer
     release_gpu()
-    return [f"grad_{t}" for t in gc["targets"]] + ["rep", "random"]
+    return [f"grad_{t}" for t in gc["targets"]] + ["rep", "random"] + (["classifier"] if cls is not None else [])
 
 
 def select_subsets(out_dir: Path, data: GateData, primary: str, k: int, seed: int) -> dict[str, list]:
@@ -89,10 +113,10 @@ def run(cfg: dict, out_dir: Path, data: GateData | None = None, loader=None, jud
     print(f"[data] {data.summary()}", flush=True)
 
     fp = calibrate_or_load(out_dir, loader, data, cfg["probe"], seed)
-    cols = score_pool(out_dir, data, fp, loader, cfg["gate"], seed)
+    judge = judge or make_judge(cfg["judge"])
+    cols = score_pool(out_dir, data, fp, loader, cfg["gate"], seed, judge)
     primary = cfg["gate"].get("primary") or f"grad_{cfg['gate']['targets'][0]}"
 
-    judge = judge or make_judge(cfg["judge"])
     subsets = select_subsets(out_dir, data, primary, cfg["select"]["k"], seed)
     for cond in cfg["conditions"]:
         run_condition(cond, subsets[cond], out_dir, fp, loader, data, judge, cfg, seed, heldout=data.heldout_benign)

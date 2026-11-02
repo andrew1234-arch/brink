@@ -222,7 +222,8 @@ def test_repair_experiment_end_to_end(tmp_path):
     g = _data()
     data = RepairData(g.harmful_cal, g.harmless_cal, g.harmful_probe, g.harmless_probe, g.eval_harmful,
                       g.train["control"] + g.train["pos"][:4], g.train["control"][:4],
-                      [f"write a poem about the sky {i}" for i in range(4)])
+                      [f"write a poem about the sky {i}" for i in range(4)],
+                      train_safety_mix=g.train["control"] + g.train["pos"][:4] + g.train["control"][-4:])
     cfg = yaml.safe_load((ROOT / "configs" / "repair.yaml").read_text())
     cfg["model"]["id"] = str(d)
     cfg["probe"].update(batch_size=4, n_tokens=3, bootstrap=10, every=2)

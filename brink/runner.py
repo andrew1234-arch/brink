@@ -44,6 +44,30 @@ def calibrate_or_load(out_dir: Path, loader, sets, pc: dict, seed: int) -> Safet
     return fp
 
 
+def make_cheap_check(tok, sets, ec: dict):
+    """Baseline monitor: ASR of `n` held-out harmful prompts, short greedy replies, keyword judge."""
+    cc = ec.get("cheap_judge")
+    if not cc:
+        return None
+    from brink.eval.behavioral import KeywordJudge, generate
+
+    prompts, judge = sets.eval_harmful[:cc.get("n", 16)], KeywordJudge()
+
+    def check(m):
+        replies = generate(m, tok, prompts, cc.get("max_new_tokens", 32), cc.get("batch_size", 16))
+        return sum(r["harmful"] for r in judge(prompts, replies)) / len(prompts)
+    return check
+
+
+def seeds_of(cfg: dict) -> list[int]:
+    return list(cfg.get("seeds") or [cfg.get("seed", 0)])
+
+
+def run_name(cond: str, seed: int, cfg: dict) -> str:
+    """`pos` for a single-seed run, `pos_s1` when several seeds are configured."""
+    return cond if len(seeds_of(cfg)) == 1 else f"{cond}_s{seed}"
+
+
 def run_condition(name: str, pairs: list[Pair], out_dir: Path, fp: SafetyFingerprint, loader, sets, judge,
                   cfg: dict, seed: int, heldout: list[Pair] | None = None) -> None:
     """Fine-tune on `pairs` with the monitor attached. Skips if already DONE (resumable)."""
@@ -64,7 +88,7 @@ def run_condition(name: str, pairs: list[Pair], out_dir: Path, fp: SafetyFingerp
         return metrics, records
 
     prober = Prober(fp, tok, sets.harmful_probe, sets.harmless_probe, pc["batch_size"])
-    monitor = Monitor(prober, cdir, pc["every"], ec["steps"], evaluator)
+    monitor = Monitor(prober, cdir, pc["every"], ec["steps"], evaluator, cheap_check=make_cheap_check(tok, sets, ec))
     model = lora_sft(model, tok, examples, tc, seed, monitor, CsvLog(cdir / "train.csv"))
     (cdir / "DONE").write_text("ok\n")
     del model, monitor, prober

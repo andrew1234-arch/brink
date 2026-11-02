@@ -51,9 +51,9 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict) -> dict:
             checks["R2_keeps_task_capability"] = bool(ok) and best in dict(ok)
             if br.get("over_refusal") is not None and br.get("over_refusal0") is not None:
                 checks["R3_no_over_refusal"] = br["over_refusal"] - br["over_refusal0"] <= cfg["max_over_refusal_increase"]
-            ph = [r for c, r in res.items() if c in POSTHOC and r and r.get("asr") is not None]
+            ph = [r for c, r in res.items() if c in POSTHOC + ("safety_mix",) and r and r.get("asr") is not None]
             if ph:
-                checks["R4_beats_posthoc_repair"] = all(
+                checks["R4_beats_baselines_posthoc_and_safety_mix"] = all(
                     br["asr"] <= r["asr"] and (r.get("heldout_loss") is None or br["heldout_loss"] <= r["heldout_loss"] * 1.02)
                     for r in ph)
         elif drift <= 0:
@@ -116,11 +116,11 @@ def _plot(out_dir: Path, res: dict) -> None:
     if not pts:
         return
     fam = {"brink": ("#2a78d6", "Brink (in training)"), "posthoc": ("#eb6834", "post-hoc (SafeTune)"),
-           "none": ("#898781", "no repair")}
+           "none": ("#898781", "no repair / data-mix baseline")}
     fig, ax = plt.subplots(figsize=(7.5, 5))
     seen = set()
     for c, r in pts:
-        key = "none" if c == "none" else ("posthoc" if c in POSTHOC else "brink")
+        key = "none" if c in ("none", "safety_mix") else ("posthoc" if c in POSTHOC else "brink")
         color, label = fam[key]
         ax.scatter(r["heldout_loss"], r["asr"], s=70, color=color, edgecolors="white", linewidths=2, zorder=3,
                    label=None if key in seen else label)
