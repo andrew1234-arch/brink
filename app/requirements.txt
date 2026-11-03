@@ -1,4 +1,4 @@
 # Dashboard only (CPU is enough). The training / probing code needs the full stack in pyproject.toml.
-gradio>=5
+gradio>=6
 plotly>=5
 numpy

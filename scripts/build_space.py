@@ -24,6 +24,8 @@ emoji: 🛡️
 colorFrom: blue
 colorTo: red
 sdk: gradio
+sdk_version: 6.31.0
+python_version: "3.12"
 app_file: app.py
 pinned: false
 license: mit
@@ -93,14 +95,21 @@ def main():
     ap.add_argument("--results", default=str(ROOT / "results"))
     ap.add_argument("--demo", action="store_true", help="include clearly-bannered simulated runs")
     ap.add_argument("--push", metavar="REPO_ID", help="upload to this Space (needs HF_TOKEN with write access)")
+    ap.add_argument("--public", action="store_true", help="create the Space public (default: private)")
     args = ap.parse_args()
     out = build(Path(args.out), Path(args.results), args.demo)
     if args.push:
         from huggingface_hub import HfApi
 
         api = HfApi()
-        api.create_repo(args.push, repo_type="space", space_sdk="gradio", exist_ok=True)
-        api.upload_folder(folder_path=str(out), repo_id=args.push, repo_type="space")
+        api.create_repo(args.push, repo_type="space", space_sdk="gradio", private=not args.public, exist_ok=True)
+        api.upload_folder(
+            folder_path=str(out),
+            repo_id=args.push,
+            repo_type="space",
+            commit_message="Deploy Brink dashboard",
+            delete_patterns=["results/**"],
+        )
         print(f"pushed to https://huggingface.co/spaces/{args.push}")
 
 

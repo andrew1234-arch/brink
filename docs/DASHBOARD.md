@@ -45,9 +45,28 @@ Locally, `python app/app.py --demo-live` shows the same behaviour with a simulat
 
 ## Hugging Face Space
 
-The Space needs `app/app.py`, the `brink/` package and `app/requirements.txt`, plus the run folders to show
-(`results/...`, small CSV / JSON files only). The app reads from `results/` by default; set `--results`
-if the runs live elsewhere.
+**Automatic deploy (recommended).** `.github/workflows/deploy-space.yml` builds the Space and pushes it on every
+push to `main` or `results/all`, or on demand from the Actions tab. It uses the real runs from `results/all`
+once any exist, and the clearly bannered simulated runs until then. Each deploy replaces the previous results.
+
+One-time setup, in the GitHub repo under **Settings → Secrets and variables → Actions**:
+
+| Kind | Name | Value |
+|---|---|---|
+| Secret | `HF_TOKEN` | a Hugging Face token with **write** access |
+| Variable | `HF_SPACE_ID` | e.g. `your-hf-username/brink` (the Space is created if it doesn't exist) |
+| Variable | `HF_SPACE_PUBLIC` | `true` to make it public; anything else keeps it private |
+
+Without the secret and variable, the workflow does nothing and says so in its log.
+
+**By hand:**
+
+```bash
+python scripts/build_space.py --out build/space --demo --push your-hf-username/brink
+```
+
+This needs `HF_TOKEN` in the environment. Add `--public` for a public Space. The Space pins the Gradio version
+the dashboard is tested with, and contains no model replies, tensors or adapters.
 
 ## Design notes
 

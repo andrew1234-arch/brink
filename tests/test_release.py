@@ -79,3 +79,38 @@ def test_pipeline_layout_and_work_dir(tmp_path):
     assert any("adapters/brink/" in f for f in files)
     assert not any("/naive/" in f for f in files)  # the unprotected pipeline model stays private
     assert not any(f.endswith(("raw.jsonl", "manifest.json")) for f in files)
+
+
+def test_space_push_defaults_to_private(tmp_path, monkeypatch):
+    """The deploy path creates a private Gradio Space unless --public, and clears stale results on upload."""
+    import huggingface_hub
+
+    import scripts.build_space as bs
+
+    calls = {}
+
+    class FakeApi:
+        def create_repo(self, repo_id, **kw):
+            calls["create"] = (repo_id, kw)
+
+        def upload_folder(self, **kw):
+            calls["upload"] = kw
+
+    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
+    for public in (False, True):
+        argv = [
+            "build_space.py",
+            "--out",
+            str(tmp_path / "space"),
+            "--results",
+            str(tmp_path / "none"),
+            "--demo",
+            "--push",
+            "me/brink",
+        ] + (["--public"] if public else [])
+        monkeypatch.setattr(sys, "argv", argv)
+        bs.main()
+        repo_id, kw = calls["create"]
+        assert repo_id == "me/brink" and kw["repo_type"] == "space" and kw["space_sdk"] == "gradio"
+        assert kw["private"] is (not public)
+        assert calls["upload"]["repo_id"] == "me/brink" and calls["upload"]["delete_patterns"] == ["results/**"]
