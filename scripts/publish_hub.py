@@ -50,13 +50,16 @@ def collect(results: Path, stage: Path, adapters: list[str]) -> list[str]:
             dst = stage / "fingerprints" / rel
         elif "adapter" in parts or "adapters" in parts:
             # repair layout: <exp>/<cond>/adapter/...   pipeline layout: _work/<exp>/adapters/<cond>/...
-            cond = (rel.parts[rel.parts.index("adapter") - 1] if "adapter" in parts
-                    else rel.parts[rel.parts.index("adapters") + 1])
+            cond = (
+                rel.parts[rel.parts.index("adapter") - 1]
+                if "adapter" in parts
+                else rel.parts[rel.parts.index("adapters") + 1]
+            )
             if cond not in adapters:
                 continue
             dst = stage / "adapters" / rel
         elif "_work" in parts:
-            continue                                   # curated data, trainer outputs: never published
+            continue  # curated data, trainer outputs: never published
         elif f.suffix in ALLOWED:
             dst = stage / "results" / rel
         else:
@@ -72,7 +75,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--repo", required=True)
     ap.add_argument("--results", default=str(ROOT / "results"))
-    ap.add_argument("--adapters", nargs="*", default=[], help=f"conditions whose adapter to include: {sorted(PROTECTED)}")
+    ap.add_argument(
+        "--adapters", nargs="*", default=[], help=f"conditions whose adapter to include: {sorted(PROTECTED)}"
+    )
     ap.add_argument("--private", action="store_true")
     ap.add_argument("--yes", action="store_true", help="actually upload (default: dry run)")
     args = ap.parse_args()

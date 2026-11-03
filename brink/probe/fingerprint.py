@@ -14,13 +14,13 @@ from brink.probe.signals import SIGNALS, Collected, collect, compute_signals
 
 @dataclass
 class SafetyFingerprint:
-    layer: int                         # l*, fixed at calibration (never auto-picked at runtime)
-    directions: torch.Tensor           # [L+1, d] unit refusal direction per layer
+    layer: int  # l*, fixed at calibration (never auto-picked at runtime)
+    directions: torch.Tensor  # [L+1, d] unit refusal direction per layer
     refusal_ids: list[int]
     compliance_ids: list[int]
-    baseline: dict[str, float]         # signal values on the reference model (probe split)
-    noise: dict[str, float]            # bootstrap std of each signal (resampling probe prompts)
-    separation: list[float] = field(default_factory=list)   # Cohen's d per layer, for the record
+    baseline: dict[str, float]  # signal values on the reference model (probe split)
+    noise: dict[str, float]  # bootstrap std of each signal (resampling probe prompts)
+    separation: list[float] = field(default_factory=list)  # Cohen's d per layer, for the record
     meta: dict = field(default_factory=dict)
 
     @property
@@ -39,7 +39,7 @@ class SafetyFingerprint:
         path.with_suffix(".json").write_text(json.dumps(d, indent=2, ensure_ascii=False))
 
     @classmethod
-    def load(cls, path: Path) -> "SafetyFingerprint":
+    def load(cls, path: Path) -> SafetyFingerprint:
         path = Path(path)
         d = json.loads(path.with_suffix(".json").read_text())
         d["directions"] = torch.load(path.with_suffix(".pt"))["directions"]
@@ -50,9 +50,19 @@ def _special_ids(tok) -> set[int]:
     return set(getattr(tok, "all_special_ids", []) or [])
 
 
-def calibrate(model, tok, harmful_cal: list[str], harmless_cal: list[str], harmful_probe: list[str],
-              harmless_probe: list[str], batch_size: int = 8, layer_range=(0.2, 0.8), n_tokens: int = 10,
-              n_bootstrap: int = 200, seed: int = 0) -> tuple[SafetyFingerprint, dict[str, float]]:
+def calibrate(
+    model,
+    tok,
+    harmful_cal: list[str],
+    harmless_cal: list[str],
+    harmful_probe: list[str],
+    harmless_probe: list[str],
+    batch_size: int = 8,
+    layer_range=(0.2, 0.8),
+    n_tokens: int = 10,
+    n_bootstrap: int = 200,
+    seed: int = 0,
+) -> tuple[SafetyFingerprint, dict[str, float]]:
     """Build the fingerprint from the reference model.
 
     Calibration split -> refusal directions and refusal / compliance first tokens.
@@ -61,7 +71,7 @@ def calibrate(model, tok, harmful_cal: list[str], harmless_cal: list[str], harmf
     hc = collect(model, tok, harmful_cal, batch_size)
     bc = collect(model, tok, harmless_cal, batch_size)
 
-    directions = F.normalize(hc.acts.mean(1) - bc.acts.mean(1), dim=-1)          # [L+1, d]
+    directions = F.normalize(hc.acts.mean(1) - bc.acts.mean(1), dim=-1)  # [L+1, d]
 
     # Refusal tokens: most over-represented first tokens on harmful vs harmless prompts; and vice versa.
     p_h, p_b = hc.logp.exp().mean(0), bc.logp.exp().mean(0)
@@ -78,10 +88,10 @@ def calibrate(model, tok, harmful_cal: list[str], harmless_cal: list[str], harmf
     proj_h = torch.einsum("lnd,ld->ln", hp.acts, directions)
     proj_b = torch.einsum("lnd,ld->ln", bp.acts, directions)
     pooled = ((proj_h.var(1) + proj_b.var(1)) / 2).sqrt().clamp(min=1e-8)
-    sep = ((proj_h.mean(1) - proj_b.mean(1)) / pooled)
+    sep = (proj_h.mean(1) - proj_b.mean(1)) / pooled
     n_layers = directions.shape[0] - 1
     lo, hi = max(1, int(layer_range[0] * n_layers)), max(1, int(layer_range[1] * n_layers))
-    layer = lo + int(torch.argmax(sep[lo:hi + 1]).item())
+    layer = lo + int(torch.argmax(sep[lo : hi + 1]).item())
 
     # Restrict probe-split log-probs to the selected tokens, as the live prober will.
     sel = torch.tensor(refusal_ids + compliance_ids)
@@ -102,8 +112,13 @@ def calibrate(model, tok, harmful_cal: list[str], harmless_cal: list[str], harmf
     noise = {k: float(torch.tensor(v).std().item()) for k, v in boots.items()}
 
     fp = SafetyFingerprint(
-        layer=layer, directions=directions, refusal_ids=refusal_ids, compliance_ids=compliance_ids,
-        baseline={k: baseline[k] for k in SIGNALS}, noise=noise, separation=sep.tolist(),
+        layer=layer,
+        directions=directions,
+        refusal_ids=refusal_ids,
+        compliance_ids=compliance_ids,
+        baseline={k: baseline[k] for k in SIGNALS},
+        noise=noise,
+        separation=sep.tolist(),
         meta={
             "n_layers": n_layers,
             "refusal_tokens": [tok.decode([i]) for i in refusal_ids],
@@ -112,4 +127,3 @@ def calibrate(model, tok, harmful_cal: list[str], harmless_cal: list[str], harmf
         },
     )
     return fp, baseline
-

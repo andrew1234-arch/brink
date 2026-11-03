@@ -39,7 +39,7 @@ results for every experiment run. The alarm rule can be changed live.
 Code: https://github.com/andrew1234-arch/brink
 """
 
-SPACE_APP = '''import sys
+SPACE_APP = """import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -49,7 +49,7 @@ from dashboard import CSS, build  # noqa: E402
 
 demo = build(HERE / "results")
 demo.launch(css=CSS, js="() => { document.body.classList.remove('dark'); }")
-'''
+"""
 
 
 def copy_results(src: Path, dst: Path) -> int:
@@ -67,14 +67,14 @@ def build(out: Path, results: Path, demo: bool) -> Path:
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
-    shutil.copy2(ROOT / "app" / "app.py", out / "dashboard.py")      # not app.py: the Space entry point is app.py
+    shutil.copy2(ROOT / "app" / "app.py", out / "dashboard.py")  # not app.py: the Space entry point is app.py
     shutil.copytree(ROOT / "brink", out / "brink", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy2(ROOT / "app" / "requirements.txt", out / "requirements.txt")
     (out / "README.md").write_text(SPACE_README)
     (out / "app.py").write_text(SPACE_APP)
     n = copy_results(results, out / "results") if results.exists() else 0
     if demo:
-        from brink.dashboard.simulate import simulate_gate, simulate_go_nogo  # noqa: E402
+        from brink.dashboard.simulate import simulate_gate, simulate_go_nogo
 
         simulate_go_nogo(out / "results" / "simulated_go_nogo")
         simulate_gate(out / "results" / "simulated_gate")

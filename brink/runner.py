@@ -33,12 +33,26 @@ def calibrate_or_load(out_dir: Path, loader, sets, pc: dict, seed: int) -> Safet
         return fp
     model, tok = loader()
     t0 = time.time()
-    fp, _ = calibrate(model, tok, sets.harmful_cal, sets.harmless_cal, sets.harmful_probe, sets.harmless_probe,
-                      pc["batch_size"], tuple(pc["layer_range"]), pc["n_tokens"], pc["bootstrap"], seed)
+    fp, _ = calibrate(
+        model,
+        tok,
+        sets.harmful_cal,
+        sets.harmless_cal,
+        sets.harmful_probe,
+        sets.harmless_probe,
+        pc["batch_size"],
+        tuple(pc["layer_range"]),
+        pc["n_tokens"],
+        pc["bootstrap"],
+        seed,
+    )
     fp.meta["calibration_seconds"] = round(time.time() - t0, 1)
     fp.save(fp_path)
-    print(f"[calibrate] layer {fp.layer}/{fp.meta['n_layers']}  refusal tokens {fp.meta['refusal_tokens']}  "
-          f"compliance tokens {fp.meta['compliance_tokens']}", flush=True)
+    print(
+        f"[calibrate] layer {fp.layer}/{fp.meta['n_layers']}  refusal tokens {fp.meta['refusal_tokens']}  "
+        f"compliance tokens {fp.meta['compliance_tokens']}",
+        flush=True,
+    )
     del model
     release_gpu()
     return fp
@@ -51,11 +65,12 @@ def make_cheap_check(tok, sets, ec: dict):
         return None
     from brink.eval.behavioral import KeywordJudge, generate
 
-    prompts, judge = sets.eval_harmful[:cc.get("n", 16)], KeywordJudge()
+    prompts, judge = sets.eval_harmful[: cc.get("n", 16)], KeywordJudge()
 
     def check(m):
         replies = generate(m, tok, prompts, cc.get("max_new_tokens", 32), cc.get("batch_size", 16))
         return sum(r["harmful"] for r in judge(prompts, replies)) / len(prompts)
+
     return check
 
 
@@ -68,8 +83,18 @@ def run_name(cond: str, seed: int, cfg: dict) -> str:
     return cond if len(seeds_of(cfg)) == 1 else f"{cond}_s{seed}"
 
 
-def run_condition(name: str, pairs: list[Pair], out_dir: Path, fp: SafetyFingerprint, loader, sets, judge,
-                  cfg: dict, seed: int, heldout: list[Pair] | None = None) -> None:
+def run_condition(
+    name: str,
+    pairs: list[Pair],
+    out_dir: Path,
+    fp: SafetyFingerprint,
+    loader,
+    sets,
+    judge,
+    cfg: dict,
+    seed: int,
+    heldout: list[Pair] | None = None,
+) -> None:
     """Fine-tune on `pairs` with the monitor attached. Skips if already DONE (resumable)."""
     cdir = Path(out_dir) / name
     if (cdir / "DONE").exists():

@@ -71,13 +71,21 @@ class BrinkSafetyGate(BaseGate):
         passed: list[DataSample] = []
         rejected: list[RejectedSample] = []
         for s, sc, d, rk in zip(samples, scores, drop, rank):
-            notes = {"safety_drift_score": round(float(sc), 6), "rank": int(rk), "n": len(samples),
-                     "drop_frac": self.drop_frac, "threshold": self.threshold, "passed": not bool(d)}
-            rec = ProvenanceRecord(step_name=STEP_NAME, step_version=STEP_VERSION, timestamp=ts,
-                                   config_hash=cfg_hash, notes=notes)
+            notes = {
+                "safety_drift_score": round(float(sc), 6),
+                "rank": int(rk),
+                "n": len(samples),
+                "drop_frac": self.drop_frac,
+                "threshold": self.threshold,
+                "passed": not bool(d),
+            }
+            rec = ProvenanceRecord(
+                step_name=STEP_NAME, step_version=STEP_VERSION, timestamp=ts, config_hash=cfg_hash, notes=notes
+            )
             if d:
-                rej = RejectedSample(**s.model_dump(), rejection_reason=f"brink_safety_drift:{float(sc):.4f}",
-                                     rejecting_step=STEP_NAME)
+                rej = RejectedSample(
+                    **s.model_dump(), rejection_reason=f"brink_safety_drift:{float(sc):.4f}", rejecting_step=STEP_NAME
+                )
                 rej.append_provenance(rec)
                 rejected.append(rej)
             else:

@@ -33,13 +33,17 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict) -> dict:
             checks["P1_removes_most_of_the_drift"] = (nf["asr"] - bf["asr"]) / drift >= cfg["min_drift_removed"]
         else:
             checks["P0_naive_pipeline_drifted"] = False
-        checks["P2_learns_the_task"] = (bf["heldout_loss"] is not None and ref["heldout_loss"] is not None
-                                        and bf["heldout_loss"] <= nf["heldout_loss"] * (1 + cfg["max_loss_increase"])
-                                        and bf["heldout_loss"] < ref["heldout_loss"])
+        checks["P2_learns_the_task"] = (
+            bf["heldout_loss"] is not None
+            and ref["heldout_loss"] is not None
+            and bf["heldout_loss"] <= nf["heldout_loss"] * (1 + cfg["max_loss_increase"])
+            and bf["heldout_loss"] < ref["heldout_loss"]
+        )
         if bf.get("over_refusal") is not None and ref.get("over_refusal") is not None:
             checks["P3_no_over_refusal"] = bf["over_refusal"] - ref["over_refusal"] <= cfg["max_over_refusal_increase"]
-        checks["P4_runs_on_the_lexsi_stack"] = ("aligntune" in str(brink["info"].get("trainer", ""))
-                                                and brink["gate"] is not None)
+        checks["P4_runs_on_the_lexsi_stack"] = (
+            "aligntune" in str(brink["info"].get("trainer", "")) and brink["gate"] is not None
+        )
     verdict = "PIPELINE DELIVERS" if checks and all(checks.values()) else "PIPELINE NOT PROVEN"
     summary = {"verdict": verdict, "checks": checks, "conditions": res}
     write_json(out_dir / "summary.json", summary)
@@ -61,23 +65,34 @@ def _report(s: dict) -> str:
     rows = [(c, r) for c, r in s["conditions"].items() if r]
     if rows:
         ref = rows[0][1]["ref"]
-        L += ["", "| model | Hindi task loss ↓ | ASR English ↓ (95 % CI) | ASR Hindi ↓ | over-refusal (Hindi) ↓ | "
-              "AuditKIT attacks resisted ↑ | trainer | alarm / repair |", "|---|---|---|---|---|---|---|---|",
-              f"| reference (Tiny Aya, no fine-tuning) | {_x(ref.get('heldout_loss'))} | {_p(ref.get('asr'))} | "
-              f"{_p(ref.get('asr_hi'))} | {_p(ref.get('over_refusal'))} | {_p(ref.get('redteam_attack_resistance'))} | – | – |"]
+        L += [
+            "",
+            "| model | Hindi task loss ↓ | ASR English ↓ (95 % CI) | ASR Hindi ↓ | over-refusal (Hindi) ↓ | "
+            "AuditKIT attacks resisted ↑ | trainer | alarm / repair |",
+            "|---|---|---|---|---|---|---|---|",
+            f"| reference (Tiny Aya, no fine-tuning) | {_x(ref.get('heldout_loss'))} | {_p(ref.get('asr'))} | "
+            f"{_p(ref.get('asr_hi'))} | {_p(ref.get('over_refusal'))} | "
+            f"{_p(ref.get('redteam_attack_resistance'))} | – | – |",
+        ]
         for c, r in rows:
             f, i = r["final"], r["info"]
             ci = f" ({r['asr_ci'][0]:.0%}–{r['asr_ci'][1]:.0%})" if r["asr_ci"] else ""
             rep = f"alarm at {i.get('alarm_step')}" if i.get("alarm_step") is not None else "no alarm"
             if i.get("rolled_back_to") is not None:
                 rep += f", rolled back to {i['rolled_back_to']}, guard on"
-            L.append(f"| {c} | {_x(f.get('heldout_loss'))} | {_p(f.get('asr'))}{ci} | {_p(f.get('asr_hi'))} | "
-                     f"{_p(f.get('over_refusal'))} | {_p(f.get('redteam_attack_resistance'))} | {i.get('trainer', 'n/a')} | {rep} |")
+            L.append(
+                f"| {c} | {_x(f.get('heldout_loss'))} | {_p(f.get('asr'))}{ci} | {_p(f.get('asr_hi'))} | "
+                f"{_p(f.get('over_refusal'))} | {_p(f.get('redteam_attack_resistance'))} | "
+                f"{i.get('trainer', 'n/a')} | {rep} |"
+            )
         for c, r in rows:
             g = r["gate"]
             if g:
-                L += ["", f"**CuratorKIT + BrinkSafetyGate ({c}):** dropped {g['rejected_by_gate']} of {g['input']} samples "
-                          f"(top {g['drop_frac']:.0%} by predicted refusal erosion), catching **{g['planted_caught']} of "
-                          f"{g['planted_total']}** contaminating samples; {g['benign_dropped']} benign samples dropped."]
+                L += [
+                    "",
+                    f"**CuratorKIT + BrinkSafetyGate ({c}):** dropped {g['rejected_by_gate']} of {g['input']} samples "
+                    f"(top {g['drop_frac']:.0%} by predicted refusal erosion), catching **{g['planted_caught']} of "
+                    f"{g['planted_total']}** contaminating samples; {g['benign_dropped']} benign samples dropped.",
+                ]
     L.append("\nThe Hindi ASR uses an English-trained judge and is less reliable than the English ASR.")
     return "\n".join(L) + "\n"

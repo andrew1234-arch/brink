@@ -20,15 +20,15 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from brink.analysis.multilingual import analyze  # noqa: E402
-from brink.data import MultilingualData, build_multilingual_data, tokenize_sft  # noqa: E402
-from brink.eval.behavioral import evaluate_behavior, make_judge  # noqa: E402
-from brink.monitor.core import Monitor  # noqa: E402
-from brink.probe.multilingual import MultiProber, calibrate_languages  # noqa: E402
-from brink.runner import release_gpu  # noqa: E402
-from brink.train_loop import lora_sft  # noqa: E402
-from brink.utils import CsvLog, set_seed, write_json  # noqa: E402
-from experiments.go_nogo import make_loader  # noqa: E402
+from brink.analysis.multilingual import analyze
+from brink.data import MultilingualData, build_multilingual_data, tokenize_sft
+from brink.eval.behavioral import evaluate_behavior, make_judge
+from brink.monitor.core import Monitor
+from brink.probe.multilingual import MultiProber, calibrate_languages
+from brink.runner import release_gpu
+from brink.train_loop import lora_sft
+from brink.utils import CsvLog, set_seed, write_json
+from experiments.go_nogo import make_loader
 
 
 def make_evaluator(tok, data: MultilingualData, judge, ec: dict):
@@ -48,6 +48,7 @@ def make_evaluator(tok, data: MultilingualData, judge, ec: dict):
             records += [{"lang": code, **r} for r in rec]
         metrics["asr_worst"] = worst
         return metrics, records
+
     return evaluator
 
 
@@ -82,8 +83,15 @@ def run(cfg: dict, out_dir: Path, data: MultilingualData | None = None, loader=N
         model, tok = loader()
         prober = MultiProber(fps, tok, data.langs, pc["batch_size"])
         monitor = Monitor(prober, cdir, pc["every"], ec["steps"], make_evaluator(tok, data, judge, ec))
-        model = lora_sft(model, tok, tokenize_sft(tok, data.train[cond], cfg["train"]["max_len"]), cfg["train"],
-                         seed, monitor, CsvLog(cdir / "train.csv"))
+        model = lora_sft(
+            model,
+            tok,
+            tokenize_sft(tok, data.train[cond], cfg["train"]["max_len"]),
+            cfg["train"],
+            seed,
+            monitor,
+            CsvLog(cdir / "train.csv"),
+        )
         (cdir / "DONE").write_text("ok\n")
         del model, monitor, prober
         release_gpu()

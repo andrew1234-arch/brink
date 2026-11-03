@@ -21,8 +21,19 @@ def calibrate_languages(model, tok, langs: dict, pc: dict, seed: int, out_dir: P
         if path and path.with_suffix(".json").exists() and path.with_suffix(".pt").exists():
             fps[code] = SafetyFingerprint.load(path)
             continue
-        fp, _ = calibrate(model, tok, s.harmful_cal, s.harmless_cal, s.harmful_probe, s.harmless_probe,
-                          pc["batch_size"], tuple(pc["layer_range"]), pc["n_tokens"], pc["bootstrap"], seed)
+        fp, _ = calibrate(
+            model,
+            tok,
+            s.harmful_cal,
+            s.harmless_cal,
+            s.harmful_probe,
+            s.harmless_probe,
+            pc["batch_size"],
+            tuple(pc["layer_range"]),
+            pc["n_tokens"],
+            pc["bootstrap"],
+            seed,
+        )
         fp.meta["language"] = code
         if path:
             fp.save(path)
@@ -34,8 +45,9 @@ def calibrate_languages(model, tok, langs: dict, pc: dict, seed: int, out_dir: P
 class MultiProber:
     def __init__(self, fps: dict, tok, langs: dict, batch_size: int = 8):
         self.primary = next(iter(fps))
-        self.probers = {c: Prober(fps[c], tok, langs[c].harmful_probe, langs[c].harmless_probe, batch_size)
-                        for c in fps}
+        self.probers = {
+            c: Prober(fps[c], tok, langs[c].harmful_probe, langs[c].harmless_probe, batch_size) for c in fps
+        }
 
     def __call__(self, model) -> dict:
         out: dict = {}

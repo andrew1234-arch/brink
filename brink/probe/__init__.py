@@ -29,4 +29,4 @@ class Prober:
         return sig
 
 
-__all__ = ["Prober", "SafetyFingerprint", "calibrate", "collect", "compute_signals", "SIGNALS", "ALARM_SIGNALS"]
+__all__ = ["ALARM_SIGNALS", "SIGNALS", "Prober", "SafetyFingerprint", "calibrate", "collect", "compute_signals"]

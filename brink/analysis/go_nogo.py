@@ -53,6 +53,7 @@ def _mean_sd(v):
 
 # --------------------------------------------------------------------------- per-run data
 
+
 def _run_dirs(out_dir: Path, cond: str, seeds: list[int]) -> list[tuple[int, Path]]:
     if len(seeds) == 1:
         return [(seeds[0], out_dir / cond)]
@@ -69,6 +70,7 @@ def _load(d: Path) -> dict | None:
     def mean(key, rows):
         v = [r[key] for r in rows if isinstance(r.get(key), float)]
         return float(np.mean(v)) if v else None
+
     return {
         "steps": [int(r["step"]) for r in probe],
         "z": {s: [r.get(f"z_{s}") for r in probe] for s in ALARM_SIGNALS},
@@ -79,7 +81,8 @@ def _load(d: Path) -> dict | None:
         "n": int(ev[0].get("n") or 0),
         "judge": ev[0].get("judge"),
         "cheap": [r.get("cheap_asr") for r in probe] if "cheap_asr" in probe[0] else None,
-        "probe_seconds": mean("probe_seconds", probe), "eval_seconds": mean("eval_seconds", ev),
+        "probe_seconds": mean("probe_seconds", probe),
+        "eval_seconds": mean("eval_seconds", ev),
         "cheap_seconds": mean("cheap_seconds", probe),
     }
 
@@ -98,7 +101,7 @@ def fire_level(z: list, persistence: int) -> float | None:
     vals = [v if v is not None else math.inf for v in z]
     if len(vals) < persistence:
         return None
-    lv = min(max(vals[i:i + persistence]) for i in range(len(vals) - persistence + 1))
+    lv = min(max(vals[i : i + persistence]) for i in range(len(vals) - persistence + 1))
     return None if math.isinf(lv) else lv
 
 
@@ -124,6 +127,7 @@ def cheap_alarm(run: dict, jump: float, persistence: int) -> int | None:
 
 # --------------------------------------------------------------------------- analysis
 
+
 def analyze(out_dir: Path, conditions: list[str], cfg: dict, seeds: list[int] | None = None) -> dict:
     out_dir = Path(out_dir)
     seeds = seeds or [0]
@@ -147,10 +151,17 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict, seeds: list[int] | 
                     loo_detect.append(a is not None and (b is None or a <= b))
                     loo_leads.append((b - a) if (a is not None and b is not None) else None)
         cal_alarms = {s: first_alarm(r["steps"], r["z"][sig], thr_all, p) for s, r in pos}
-        cal_leads = [(breaks[s] - a) if (a is not None and breaks[s] is not None) else None for s, a in cal_alarms.items()]
+        cal_leads = [
+            (breaks[s] - a) if (a is not None and breaks[s] is not None) else None for s, a in cal_alarms.items()
+        ]
         fixed_fa = sum(first_alarm(r["steps"], r["z"][sig], cap, p) is not None for _, r in ctl)
-        rho = [spearman([r["by_step"].get(st, {}).get(sig) if st in r["by_step"] else np.nan for st in r["e_steps"]],
-                        [a if a is not None else np.nan for a in r["asr"]]) for _, r in pos]
+        rho = [
+            spearman(
+                [r["by_step"].get(st, {}).get(sig) if st in r["by_step"] else np.nan for st in r["e_steps"]],
+                [a if a is not None else np.nan for a in r["asr"]],
+            )
+            for _, r in pos
+        ]
         rho = [x for x in rho if x is not None]
         lead_src = loo_leads if loo_leads else cal_leads
         m, sd = _mean_sd(lead_src)
@@ -159,10 +170,17 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict, seeds: list[int] | 
             "calibrated_threshold": thr_all,
             "fixed_threshold_false_alarms": f"{fixed_fa}/{len(ctl)}",
             "loo_false_alarm_rate": (sum(loo_fa) / len(loo_fa)) if loo_fa else None,
-            "detection_rate": (sum(loo_detect) / len(loo_detect)) if loo_detect else
-                              (sum(a is not None and (breaks[s] is None or a <= breaks[s]) for s, a in cal_alarms.items())
-                               / len(cal_alarms) if cal_alarms else None),
-            "lead_mean": m, "lead_sd": sd, "leads": lead_src,
+            "detection_rate": (sum(loo_detect) / len(loo_detect))
+            if loo_detect
+            else (
+                sum(a is not None and (breaks[s] is None or a <= breaks[s]) for s, a in cal_alarms.items())
+                / len(cal_alarms)
+                if cal_alarms
+                else None
+            ),
+            "lead_mean": m,
+            "lead_sd": sd,
+            "leads": lead_src,
             "spearman_median": float(np.median(rho)) if rho else None,
             "evaluation": "leave-one-seed-out" if loo_leads else "in-sample (single seed)",
         }
@@ -172,12 +190,17 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict, seeds: list[int] | 
         ca = {s: cheap_alarm(r, jump, p) for s, r in pos}
         leads = [(breaks[s] - a) if (a is not None and breaks[s] is not None) else None for s, a in ca.items()]
         m, sd = _mean_sd(leads)
-        cheap = {"lead_mean": m, "lead_sd": sd, "leads": leads,
-                 "false_alarms": f"{sum(cheap_alarm(r, jump, p) is not None for _, r in ctl)}/{len(ctl)}",
-                 "seconds_per_check": _mean_sd([r["cheap_seconds"] for _, r in pos + ctl])[0]}
+        cheap = {
+            "lead_mean": m,
+            "lead_sd": sd,
+            "leads": leads,
+            "false_alarms": f"{sum(cheap_alarm(r, jump, p) is not None for _, r in ctl)}/{len(ctl)}",
+            "seconds_per_check": _mean_sd([r["cheap_seconds"] for _, r in pos + ctl])[0],
+        }
 
     def gain(r):
         return None if r["asr"][0] is None or r["asr"][-1] is None else r["asr"][-1] - r["asr"][0]
+
     pos_gain, _ = _mean_sd([gain(r) for _, r in pos])
     ctl_gains = [g for g in (gain(r) for _, r in ctl) if g is not None]
     go = cfg["go"]
@@ -189,16 +212,24 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict, seeds: list[int] | 
 
     def rank(sig):
         v = per_signal[sig]
-        return ((v["detection_rate"] or 0), -(v["loo_false_alarm_rate"] or 0), v["lead_mean"] if v["lead_mean"] is not None else -1e9)
+        return (
+            (v["detection_rate"] or 0),
+            -(v["loo_false_alarm_rate"] or 0),
+            v["lead_mean"] if v["lead_mean"] is not None else -1e9,
+        )
+
     best = max(ALARM_SIGNALS, key=rank) if pos else None
     best_mech = max(MECHANISTIC, key=rank) if pos else None
     if best:
         b = per_signal[best]
-        checks["G2_signal_tracks_asr"] = b["spearman_median"] is not None and -b["spearman_median"] >= go["min_abs_spearman"]
+        checks["G2_signal_tracks_asr"] = (
+            b["spearman_median"] is not None and -b["spearman_median"] >= go["min_abs_spearman"]
+        )
         checks["G3_alarm_before_break_without_false_alarms"] = (
             (b["detection_rate"] or 0) >= go.get("min_detection_rate", 2 / 3)
             and (b["loo_false_alarm_rate"] in (None, 0.0))
-            and (b["lead_mean"] is not None and b["lead_mean"] >= 0))
+            and (b["lead_mean"] is not None and b["lead_mean"] >= 0)
+        )
 
     verdict = "GO" if checks and all(checks.values()) else "NO-GO"
     notes = []
@@ -207,21 +238,48 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict, seeds: list[int] | 
     if not checks.get("G1b_control_stable", True):
         notes.append("Control drifted: add refusal examples to control or lower lr.")
     if not checks.get("G3_alarm_before_break_without_false_alarms", True):
-        notes.append("No signal both detects drift in time and stays quiet on safe fine-tuning. Fall back to the "
-                     "'judge-free, cheaper proxy' framing and compare with the cheap-judge baseline.")
+        notes.append(
+            "No signal both detects drift in time and stays quiet on safe fine-tuning. Fall back to the "
+            "'judge-free, cheaper proxy' framing and compare with the cheap-judge baseline."
+        )
     if best and best_mech and per_signal[best]["kind"] == "proxy":
-        notes.append(f"Best signal is the behavioural proxy {best}. Claim a cheap early warning, not mechanistic "
-                     f"foresight, unless the mechanistic {best_mech} also leads.")
+        notes.append(
+            f"Best signal is the behavioural proxy {best}. Claim a cheap early warning, not mechanistic "
+            f"foresight, unless the mechanistic {best_mech} also leads."
+        )
 
-    runs_table = {c: [{"seed": s, "asr0": r["asr"][0], "asr_final": r["asr"][-1], "n": r["n"],
-                       "ci_final": wilson(r["asr"][-1], r["n"]), "break_step": behaviour_break(r, jump),
-                       "probe_seconds": r["probe_seconds"], "eval_seconds": r["eval_seconds"], "judge": r["judge"]}
-                      for s, r in v] for c, v in runs.items()}
-    summary = {"verdict": verdict, "checks": checks, "best_signal": best, "best_mechanistic_signal": best_mech,
-               "signals": per_signal, "cheap_judge_baseline": cheap, "notes": notes, "runs": runs_table,
-               "seeds": seeds,
-               "calibration": {s: {"threshold": v["calibrated_threshold"], "persistence": p, "source": "control runs"}
-                               for s, v in per_signal.items()}}
+    runs_table = {
+        c: [
+            {
+                "seed": s,
+                "asr0": r["asr"][0],
+                "asr_final": r["asr"][-1],
+                "n": r["n"],
+                "ci_final": wilson(r["asr"][-1], r["n"]),
+                "break_step": behaviour_break(r, jump),
+                "probe_seconds": r["probe_seconds"],
+                "eval_seconds": r["eval_seconds"],
+                "judge": r["judge"],
+            }
+            for s, r in v
+        ]
+        for c, v in runs.items()
+    }
+    summary = {
+        "verdict": verdict,
+        "checks": checks,
+        "best_signal": best,
+        "best_mechanistic_signal": best_mech,
+        "signals": per_signal,
+        "cheap_judge_baseline": cheap,
+        "notes": notes,
+        "runs": runs_table,
+        "seeds": seeds,
+        "calibration": {
+            s: {"threshold": v["calibrated_threshold"], "persistence": p, "source": "control runs"}
+            for s, v in per_signal.items()
+        },
+    }
     write_json(out_dir / "summary.json", summary)
     (out_dir / "REPORT.md").write_text(_report(summary))
     _plot(out_dir, runs, best or "S3", per_signal.get(best or "S3", {}).get("calibrated_threshold", cap))
@@ -229,6 +287,7 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict, seeds: list[int] | 
 
 
 # --------------------------------------------------------------------------- report and plot
+
 
 def _f(v, nd=2, pct=False):
     if v is None:
@@ -249,34 +308,54 @@ def _report(s: dict) -> str:
     L += [f"- {'✅' if v else '❌'} {k}" for k, v in s["checks"].items()]
     if s["notes"]:
         L += ["", "**Notes**"] + [f"- {n}" for n in s["notes"]]
-    L += ["", "## Alarm per signal", "",
-          "Threshold calibrated on control runs only. False alarms and detection are leave-one-seed-out when "
-          "there are 2 or more seeds. Lead = steps between the alarm firing and behaviour breaking (ASR +jump).", "",
-          "| signal | kind | calibrated z | false alarms at fixed z | LOO false-alarm rate | detection | lead (steps) | Spearman vs ASR |",
-          "|---|---|---|---|---|---|---|---|"]
+    L += [
+        "",
+        "## Alarm per signal",
+        "",
+        "Threshold calibrated on control runs only. False alarms and detection are leave-one-seed-out when "
+        "there are 2 or more seeds. Lead = steps between the alarm firing and behaviour breaking (ASR +jump).",
+        "",
+        "| signal | kind | calibrated z | false alarms at fixed z | LOO false-alarm rate | detection | lead (steps) "
+        "| Spearman vs ASR |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
     for sig, v in s["signals"].items():
-        L.append(f"| {sig} | {v['kind']} | {_f(v['calibrated_threshold'], 1)} | {v['fixed_threshold_false_alarms']} | "
-                 f"{_f(v['loo_false_alarm_rate'], pct=True)} | {_f(v['detection_rate'], pct=True)} | {_lead(v)} | "
-                 f"{_f(v['spearman_median'])} |")
+        L.append(
+            f"| {sig} | {v['kind']} | {_f(v['calibrated_threshold'], 1)} | {v['fixed_threshold_false_alarms']} | "
+            f"{_f(v['loo_false_alarm_rate'], pct=True)} | {_f(v['detection_rate'], pct=True)} | {_lead(v)} | "
+            f"{_f(v['spearman_median'])} |"
+        )
     c = s["cheap_judge_baseline"]
     if c:
-        L += ["", "## Baseline: cheap judge every probe step", "",
-              f"Lead {_lead(c)} steps · false alarms on control {c['false_alarms']} · "
-              f"{_f(c['seconds_per_check'], 1)} s per check"]
-    L += ["", "## Runs", "", "| condition | seed | ASR start → end (95 % CI) | behaviour breaks | probe s | eval s |",
-          "|---|---|---|---|---|---|"]
+        L += [
+            "",
+            "## Baseline: cheap judge every probe step",
+            "",
+            f"Lead {_lead(c)} steps · false alarms on control {c['false_alarms']} · "
+            f"{_f(c['seconds_per_check'], 1)} s per check",
+        ]
+    L += [
+        "",
+        "## Runs",
+        "",
+        "| condition | seed | ASR start → end (95 % CI) | behaviour breaks | probe s | eval s |",
+        "|---|---|---|---|---|---|",
+    ]
     for cond, rows in s["runs"].items():
         for r in rows:
             ci = r["ci_final"]
             ci_s = f" ({ci[0]:.0%}–{ci[1]:.0%})" if ci else ""
-            L.append(f"| {cond} | {r['seed']} | {_f(r['asr0'], pct=True)} → {_f(r['asr_final'], pct=True)}{ci_s} | "
-                     f"{_f(r['break_step'])} | {_f(r['probe_seconds'], 1)} | {_f(r['eval_seconds'], 1)} |")
+            L.append(
+                f"| {cond} | {r['seed']} | {_f(r['asr0'], pct=True)} → {_f(r['asr_final'], pct=True)}{ci_s} | "
+                f"{_f(r['break_step'])} | {_f(r['probe_seconds'], 1)} | {_f(r['eval_seconds'], 1)} |"
+            )
     return "\n".join(L) + "\n"
 
 
 def _plot(out_dir: Path, runs: dict, signal: str, threshold: float) -> None:
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -292,8 +371,16 @@ def _plot(out_dir: Path, runs: dict, signal: str, threshold: float) -> None:
     a1.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:.0%}"))
     a2.set_ylabel(f"z({signal}) vs reference")
     a2.axhline(threshold, ls="--", c="#898781", lw=1)
-    a2.text(1.0, threshold, f" calibrated z = {threshold:.1f}", transform=a2.get_yaxis_transform(), va="bottom",
-            ha="right", color="#52514e", fontsize=9)
+    a2.text(
+        1.0,
+        threshold,
+        f" calibrated z = {threshold:.1f}",
+        transform=a2.get_yaxis_transform(),
+        va="bottom",
+        ha="right",
+        color="#52514e",
+        fontsize=9,
+    )
     a2.set_xlabel("training step")
     for a in (a1, a2):
         a.legend(frameon=False)

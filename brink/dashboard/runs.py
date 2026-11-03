@@ -26,7 +26,7 @@ def read_rows(path: Path) -> list[dict]:
         reader = csv.DictReader(f)
         rows = []
         for r in reader:
-            if None in r or any(v is None for v in r.values()):   # truncated line
+            if None in r or any(v is None for v in r.values()):  # truncated line
                 continue
             rows.append({k: _num(v) for k, v in r.items()})
     return [r for r in rows if isinstance(r.get("step"), float)]
@@ -60,7 +60,7 @@ class Condition:
 @dataclass
 class Run:
     path: Path
-    kind: str                          # "go_nogo" | "gate" | "unknown"
+    kind: str  # "go_nogo" | "gate" | "unknown"
     conditions: dict[str, Condition]
     fingerprint: dict | None = None
     summary: dict | None = None
@@ -95,13 +95,26 @@ def load_run(path: Path) -> Run:
     path = Path(path)
     conds = {}
     for d in sorted(p for p in path.iterdir() if p.is_dir() and (p / "probe.csv").exists()):
-        conds[d.name] = Condition(d.name, read_rows(d / "probe.csv"), read_rows(d / "evals.csv"),
-                                  read_rows(d / "train.csv"), (d / "DONE").exists())
+        conds[d.name] = Condition(
+            d.name,
+            read_rows(d / "probe.csv"),
+            read_rows(d / "evals.csv"),
+            read_rows(d / "train.csv"),
+            (d / "DONE").exists(),
+        )
     meta = _json(path / "meta.json") or {}
     scores = read_rows_any(path / "scores.csv")
     kind = "gate" if scores or (path / "subsets.json").exists() else ("go_nogo" if conds else "unknown")
-    return Run(path, kind, conds, _json(path / "fingerprint.json"), _json(path / "summary.json"),
-               _json(path / "config.json"), scores, bool(meta.get("simulated")))
+    return Run(
+        path,
+        kind,
+        conds,
+        _json(path / "fingerprint.json"),
+        _json(path / "summary.json"),
+        _json(path / "config.json"),
+        scores,
+        bool(meta.get("simulated")),
+    )
 
 
 def read_rows_any(path: Path) -> list[dict]:
@@ -110,5 +123,8 @@ def read_rows_any(path: Path) -> list[dict]:
     if not path.exists():
         return []
     with path.open(newline="") as f:
-        return [{k: _num(v) for k, v in r.items()} for r in csv.DictReader(f)
-                if None not in r and all(v is not None for v in r.values())]
+        return [
+            {k: _num(v) for k, v in r.items()}
+            for r in csv.DictReader(f)
+            if None not in r and all(v is not None for v in r.values())
+        ]

@@ -19,7 +19,7 @@ SIGNAL_LABELS = {
 @dataclass
 class AlarmRule:
     signal: str = "S3"
-    method: str = "threshold"          # "threshold" | "cusum"
+    method: str = "threshold"  # "threshold" | "cusum"
     threshold: float = -3.0
     persistence: int = 2
     cusum_k: float = 0.5
@@ -72,11 +72,16 @@ def kpis(run: Run, cond: Condition, rule: AlarmRule) -> dict:
     e_mean = sum(eval_s) / len(eval_s) if eval_s else None
     max_steps = ((run.config or {}).get("train") or {}).get("max_steps")
     return {
-        "step": cond.last_step, "max_steps": max_steps, "done": cond.done,
-        "asr0": ev[0]["asr"] if ev else None, "asr_now": ev[-1]["asr"] if ev else None,
-        "alarm_step": a, "break_step": b,
+        "step": cond.last_step,
+        "max_steps": max_steps,
+        "done": cond.done,
+        "asr0": ev[0]["asr"] if ev else None,
+        "asr_now": ev[-1]["asr"] if ev else None,
+        "alarm_step": a,
+        "break_step": b,
         "lead": (b - a) if (a is not None and b is not None) else None,
-        "probe_seconds": p_mean, "eval_seconds": e_mean,
+        "probe_seconds": p_mean,
+        "eval_seconds": e_mean,
         "speedup": (e_mean / p_mean) if (p_mean and e_mean) else None,
         "judge": ev[0].get("judge") if ev else None,
     }
@@ -84,5 +89,11 @@ def kpis(run: Run, cond: Condition, rule: AlarmRule) -> dict:
 
 def rule_from_run(run: Run, signal: str = "S3") -> AlarmRule:
     a = run.analysis_cfg
-    return AlarmRule(signal=signal, threshold=a.get("z_threshold", -3.0), persistence=int(a.get("persistence", 2)),
-                     cusum_k=a.get("cusum_k", 0.5), cusum_h=a.get("cusum_h", 5.0), asr_jump=a.get("asr_jump", 0.10))
+    return AlarmRule(
+        signal=signal,
+        threshold=a.get("z_threshold", -3.0),
+        persistence=int(a.get("persistence", 2)),
+        cusum_k=a.get("cusum_k", 0.5),
+        cusum_h=a.get("cusum_h", 5.0),
+        asr_jump=a.get("asr_jump", 0.10),
+    )

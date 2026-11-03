@@ -22,14 +22,14 @@ from pathlib import Path
 
 os.environ.setdefault("GRADIO_ANALYTICS_ENABLED", "False")
 
-import gradio as gr  # noqa: E402
+import gradio as gr
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from brink.dashboard import figures as F  # noqa: E402
-from brink.dashboard.metrics import AlarmRule, alarm_step, behaviour_break, kpis, rule_from_run, status  # noqa: E402
-from brink.dashboard.runs import Run, discover_runs, load_run  # noqa: E402
+from brink.dashboard import figures as F
+from brink.dashboard.metrics import AlarmRule, alarm_step, behaviour_break, kpis, rule_from_run, status
+from brink.dashboard.runs import Run, discover_runs, load_run
 
 CSS = """
 .brink-root { --b-surface:#fcfcfb; --b-ink:#0b0b0b; --b-ink2:#52514e; --b-muted:#898781;
@@ -39,7 +39,8 @@ CSS = """
 .brink-header h1 { font-size: 22px; margin: 0; font-weight: 650; }
 .brink-header p { margin: 4px 0 0; color: var(--b-ink2); font-size: 14px; }
 .brink-tiles { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-.brink-tile { background: var(--b-surface); border: 1px solid var(--b-border); border-radius: 10px; padding: 12px 14px; }
+.brink-tile { background: var(--b-surface); border: 1px solid var(--b-border); border-radius: 10px;
+  padding: 12px 14px; }
 .brink-tile .k { font-size: 12px; color: var(--b-ink2); margin-bottom: 6px; }
 .brink-tile .v { font-size: 22px; font-weight: 600; color: var(--b-ink); line-height: 1.15; }
 .brink-tile .d { font-size: 12px; color: var(--b-muted); margin-top: 4px; }
@@ -53,8 +54,12 @@ CSS = """
 .brink-banner b { font-weight: 650; }
 """
 
-STATUS_STYLE = {"alarm": ("critical", "!", "ALARM"), "watch": ("warning", "▲", "DRIFTING"),
-                "safe": ("good", "✓", "SAFE"), "waiting": ("muted", "…", "WAITING")}
+STATUS_STYLE = {
+    "alarm": ("critical", "!", "ALARM"),
+    "watch": ("warning", "▲", "DRIFTING"),
+    "safe": ("good", "✓", "SAFE"),
+    "waiting": ("muted", "…", "WAITING"),
+}
 CONDITION_PREF = ["pos", "top", "control", "benign", "random", "bottom"]
 
 
@@ -63,8 +68,10 @@ def _fmt_pct(v):
 
 
 def _tile(k: str, v: str, d: str = "", cls: str = "") -> str:
-    return (f'<div class="brink-tile {cls}"><div class="k">{html.escape(k)}</div><div class="v">{v}</div>'
-            f'<div class="d">{html.escape(d)}</div></div>')
+    return (
+        f'<div class="brink-tile {cls}"><div class="k">{html.escape(k)}</div><div class="v">{v}</div>'
+        f'<div class="d">{html.escape(d)}</div></div>'
+    )
 
 
 def _lead_tile(lead) -> str:
@@ -77,35 +84,55 @@ def _lead_tile(lead) -> str:
 
 def tiles_html(run: Run | None, cond_name: str | None, rule: AlarmRule) -> str:
     if run is None or cond_name not in (run.conditions if run else {}):
-        return '<div class="brink-root"><div class="brink-tiles">' + _tile("Status", "—", "No run selected") + "</div></div>"
+        return (
+            '<div class="brink-root"><div class="brink-tiles">'
+            + _tile("Status", "—", "No run selected")
+            + "</div></div>"
+        )
     cond = run.conditions[cond_name]
     st, detail = status(cond, rule)
     color, icon, label = STATUS_STYLE[st]
     k = kpis(run, cond, rule)
-    step = "—" if k["step"] is None else (f'{k["step"]}' + (f' / {k["max_steps"]}' if k["max_steps"] else ""))
-    cost = "—" if not k["speedup"] else f'{k["speedup"]:.0f}×'
+    step = "—" if k["step"] is None else (f"{k['step']}" + (f" / {k['max_steps']}" if k["max_steps"] else ""))
+    cost = "—" if not k["speedup"] else f"{k['speedup']:.0f}×"
     tiles = [
         _tile("Status", f'<span class="brink-dot {color}">{icon}</span>{label}', detail, "brink-status"),
         _tile("Training step", step, "finished" if k["done"] else "running"),
-        _tile("Attack success rate", f'{_fmt_pct(k["asr0"])} → {_fmt_pct(k["asr_now"])}', f'judge: {k["judge"] or "—"}'),
-        _tile("Brink alarm", "—" if k["alarm_step"] is None else f'step {k["alarm_step"]}',
-              f'{rule.signal}, {"CUSUM" if rule.method == "cusum" else f"z ≤ {rule.threshold:g} × {rule.persistence}"}'),
-        _tile("Behaviour breaks", "—" if k["break_step"] is None else f'step {k["break_step"]}',
-              f"ASR ≥ start + {rule.asr_jump:.0%}"),
+        _tile(
+            "Attack success rate", f"{_fmt_pct(k['asr0'])} → {_fmt_pct(k['asr_now'])}", f"judge: {k['judge'] or '—'}"
+        ),
+        _tile(
+            "Brink alarm",
+            "—" if k["alarm_step"] is None else f"step {k['alarm_step']}",
+            f"{rule.signal}, {'CUSUM' if rule.method == 'cusum' else f'z ≤ {rule.threshold:g} × {rule.persistence}'}",
+        ),
+        _tile(
+            "Behaviour breaks",
+            "—" if k["break_step"] is None else f"step {k['break_step']}",
+            f"ASR ≥ start + {rule.asr_jump:.0%}",
+        ),
         _lead_tile(k["lead"]),
-        _tile("Cheaper than an eval", cost,
-              "" if not k["speedup"] else f'probe {k["probe_seconds"]:.1f}s vs eval {k["eval_seconds"]:.0f}s'),
+        _tile(
+            "Cheaper than an eval",
+            cost,
+            "" if not k["speedup"] else f"probe {k['probe_seconds']:.1f}s vs eval {k['eval_seconds']:.0f}s",
+        ),
     ]
     return '<div class="brink-root"><div class="brink-tiles">' + "".join(tiles) + "</div></div>"
 
 
 def banner_html(run: Run | None) -> str:
     if run is None:
-        return ('<div class="brink-root"><div class="brink-banner">No runs found. Point <code>--results</code> at a folder of '
-                'experiment outputs, or start with <code>--demo</code> to see simulated data.</div></div>')
+        return (
+            '<div class="brink-root"><div class="brink-banner">No runs found. Point <code>--results</code> '
+            "at a folder of "
+            "experiment outputs, or start with <code>--demo</code> to see simulated data.</div></div>"
+        )
     if run.simulated:
-        return ('<div class="brink-root"><div class="brink-banner">▲ <b>Simulated data.</b> Synthetic curves for testing '
-                'the dashboard. These are not experimental results.</div></div>')
+        return (
+            '<div class="brink-root"><div class="brink-banner">▲ <b>Simulated data.</b> Synthetic curves for testing '
+            "the dashboard. These are not experimental results.</div></div>"
+        )
     return ""
 
 
@@ -116,10 +143,17 @@ def alarm_table(run: Run | None, rule: AlarmRule) -> list[list]:
     for c in run.conditions.values():
         a, b = alarm_step(c, rule), behaviour_break(c, rule.asr_jump)
         ev = c.evals
-        rows.append([c.name, a if a is not None else "—", b if b is not None else "—",
-                     (b - a) if (a is not None and b is not None) else "—",
-                     _fmt_pct(ev[0]["asr"]) if ev else "—", _fmt_pct(ev[-1]["asr"]) if ev else "—",
-                     "yes" if c.done else "running"])
+        rows.append(
+            [
+                c.name,
+                a if a is not None else "—",
+                b if b is not None else "—",
+                (b - a) if (a is not None and b is not None) else "—",
+                _fmt_pct(ev[0]["asr"]) if ev else "—",
+                _fmt_pct(ev[-1]["asr"]) if ev else "—",
+                "yes" if c.done else "running",
+            ]
+        )
     return rows
 
 
@@ -131,9 +165,16 @@ def eval_table(run: Run | None, cond_name: str | None) -> list[list]:
     out = []
     for r in c.evals:
         p = by_step.get(int(r["step"]), {})
-        out.append([int(r["step"]), _fmt_pct(r.get("asr")), _fmt_pct(r.get("refusal_rate")), _fmt_pct(r.get("asr_keyword")),
-                    *(f'{p[f"z_{s}"]:.2f}' if isinstance(p.get(f"z_{s}"), float) else "—" for s in ("S1", "S2", "S3")),
-                    f'{r["eval_seconds"]:.0f}s' if isinstance(r.get("eval_seconds"), float) else "—"])
+        out.append(
+            [
+                int(r["step"]),
+                _fmt_pct(r.get("asr")),
+                _fmt_pct(r.get("refusal_rate")),
+                _fmt_pct(r.get("asr_keyword")),
+                *(f"{p[f'z_{s}']:.2f}" if isinstance(p.get(f"z_{s}"), float) else "—" for s in ("S1", "S2", "S3")),
+                f"{r['eval_seconds']:.0f}s" if isinstance(r.get("eval_seconds"), float) else "—",
+            ]
+        )
     return out
 
 
@@ -150,7 +191,7 @@ def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
             r = load_run(p)
             rel = p.relative_to(label_root) if p != label_root and label_root in p.parents else Path(p.name)
             out.append((f"{rel} · {r.kind}" + (" · simulated" if r.simulated else ""), str(p), r.kind))
-        out.sort(key=lambda x: (x[2] != "go_nogo", x[0]))            # go / no-go runs first
+        out.sort(key=lambda x: (x[2] != "go_nogo", x[0]))  # go / no-go runs first
         return [(label, path) for label, path, _ in out]
 
     def pick_condition(run: Run) -> str | None:
@@ -176,14 +217,16 @@ def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
         cond = run.conditions.get(cond_name) if run else None
         empty = F.fig_signals(None, rule, mode)
         return (
-            banner_html(run), tiles_html(run, cond_name, rule),
+            banner_html(run),
+            tiles_html(run, cond_name, rule),
             F.fig_signals(cond, rule, mode),
             F.fig_asr(run, rule, cond_name, mode) if run else empty,
             F.fig_layers(cond, run.fingerprint if run else None, mode),
             F.fig_compare(run, rule, mode) if run else empty,
             F.fig_gate_hist(run, mode) if run else empty,
             F.fig_gate_subsets(run, rule, mode) if run else empty,
-            alarm_table(run, rule), eval_table(run, cond_name),
+            alarm_table(run, rule),
+            eval_table(run, cond_name),
         )
 
     def rediscover(current):
@@ -196,19 +239,32 @@ def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
     first_run = load_run(Path(first)) if first else None
 
     with gr.Blocks(title="Brink monitor") as demo:
-        gr.HTML('<div class="brink-root brink-header"><h1>Brink · safety monitor</h1>'
-                "<p>Watches a model's refusal mechanism during fine-tuning and raises the alarm before its "
-                "behaviour breaks.</p></div>")
+        gr.HTML(
+            '<div class="brink-root brink-header"><h1>Brink · safety monitor</h1>'
+            "<p>Watches a model's refusal mechanism during fine-tuning and raises the alarm before its "
+            "behaviour breaks.</p></div>"
+        )
         with gr.Row():
             run_dd = gr.Dropdown(choices=choices, value=first, label="Run", scale=3)
-            cond_dd = gr.Dropdown(choices=list(first_run.conditions) if first_run else [],
-                                  value=pick_condition(first_run) if first_run else None, label="Condition", scale=1)
+            cond_dd = gr.Dropdown(
+                choices=list(first_run.conditions) if first_run else [],
+                value=pick_condition(first_run) if first_run else None,
+                label="Condition",
+                scale=1,
+            )
             signal = gr.Radio(["S3", "S1", "S2"], value="S3", label="Alarm signal", scale=1)
-            method = gr.Radio([("z threshold", "threshold"), ("CUSUM", "cusum")], value="threshold",
-                              label="Alarm rule", scale=1)
+            method = gr.Radio(
+                [("z threshold", "threshold"), ("CUSUM", "cusum")], value="threshold", label="Alarm rule", scale=1
+            )
         with gr.Row():
-            thr = gr.Slider(-8, -1, value=rule_from_run(first_run).threshold if first_run else -3.0, step=0.5,
-                            label="z threshold", scale=2)
+            thr = gr.Slider(
+                -8,
+                -1,
+                value=rule_from_run(first_run).threshold if first_run else -3.0,
+                step=0.5,
+                label="z threshold",
+                scale=2,
+            )
             persist = gr.Slider(1, 5, value=2, step=1, label="Consecutive probes", scale=2)
             live = gr.Checkbox(False, label="Live (every 5 s)", scale=1)
             dark = gr.Checkbox(False, label="Dark", scale=1)
@@ -227,8 +283,9 @@ def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
                 p_gs = gr.Plot(show_label=False)
             with gr.Tab("Tables"):
                 t_alarm = gr.Dataframe(headers=ALARM_HEADERS, label="Alarm summary (current rule)", interactive=False)
-                t_eval = gr.Dataframe(headers=EVAL_HEADERS, label="Behavioural evals, selected condition",
-                                      interactive=False)
+                t_eval = gr.Dataframe(
+                    headers=EVAL_HEADERS, label="Behavioural evals, selected condition", interactive=False
+                )
         timer = gr.Timer(5, active=False)
 
         inputs = [run_dd, cond_dd, signal, method, thr, persist, dark]
@@ -264,8 +321,13 @@ def main():
             simulate_go_nogo(root / "simulated_go_nogo")
             simulate_gate(root / "simulated_gate")
     demo = build(root)
-    demo.launch(server_name="0.0.0.0", server_port=args.port, share=args.share, css=CSS,
-                js="() => { document.body.classList.remove('dark'); }")
+    demo.launch(
+        server_name="0.0.0.0",
+        server_port=args.port,
+        share=args.share,
+        css=CSS,
+        js="() => { document.body.classList.remove('dark'); }",
+    )
 
 
 if __name__ == "__main__":

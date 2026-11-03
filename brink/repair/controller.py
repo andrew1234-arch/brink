@@ -28,7 +28,7 @@ class SnapshotBuffer:
     def save(self, step: int, model) -> None:
         params = [p.detach().to("cpu", copy=True) for p in model.parameters() if p.requires_grad]
         self.items.append((step, params))
-        self.items = self.items[-self.keep:]
+        self.items = self.items[-self.keep :]
 
     def latest_step(self) -> int | None:
         return self.items[-1][0] if self.items else None
@@ -44,8 +44,9 @@ class SnapshotBuffer:
 
 
 class RepairController:
-    def __init__(self, monitor, policy: str = "log", guard: ErosionGuard | None = None,
-                 snapshots: SnapshotBuffer | None = None):
+    def __init__(
+        self, monitor, policy: str = "log", guard: ErosionGuard | None = None, snapshots: SnapshotBuffer | None = None
+    ):
         if policy not in POLICIES:
             raise ValueError(f"policy must be one of {POLICIES}, got {policy!r}")
         if "guard" in policy and guard is None:
@@ -66,7 +67,7 @@ class RepairController:
 
     def _reset_optimizer(self) -> None:
         if self.optimizer is not None:
-            self.optimizer.state.clear()          # Adam moments re-initialise lazily
+            self.optimizer.state.clear()  # Adam moments re-initialise lazily
 
     def on_step(self, model, step: int) -> str | None:
         row = self.monitor(model, step)
@@ -85,7 +86,7 @@ class RepairController:
             self._reset_optimizer()
             self.rolled_back_to = back
             self.monitor.log_event(step, "rollback", f"restored LoRA weights from step {back}")
-            self.monitor(model, step, force_probe=True)         # confirm the restored state
+            self.monitor(model, step, force_probe=True)  # confirm the restored state
         if fired and self.policy in ("guard", "rollback_guard"):
             self.guard.active = True
             self.monitor.log_event(step, "guard_on", f"erosion guard on (target {self.guard.target})")
@@ -98,6 +99,10 @@ class RepairController:
             self.guard.project(model)
 
     def summary(self) -> dict:
-        return {"policy": self.policy, "alarm_step": self.monitor.alarm_step, "halted_at": self.halted_at,
-                "rolled_back_to": self.rolled_back_to,
-                "guard": dict(self.guard.stats) if self.guard is not None else None}
+        return {
+            "policy": self.policy,
+            "alarm_step": self.monitor.alarm_step,
+            "halted_at": self.halted_at,
+            "rolled_back_to": self.rolled_back_to,
+            "guard": dict(self.guard.stats) if self.guard is not None else None,
+        }

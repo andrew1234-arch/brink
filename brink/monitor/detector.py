@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 
 
-def first_alarm(steps: Sequence[int], z: Sequence[float], threshold: float = -3.0,
-                persistence: int = 2) -> int | None:
+def first_alarm(steps: Sequence[int], z: Sequence[float], threshold: float = -3.0, persistence: int = 2) -> int | None:
     """Step at which the alarm FIRES: the point that completes a run of `persistence` consecutive z <= threshold.
 
     This is the earliest step a live monitor could act on, so lead times computed from it are honest.

@@ -43,14 +43,25 @@ def test_hub_staging_policy(tmp_path):
     files = collect(_fake_results(tmp_path), stage, ["rollback_guard"])
     assert "fingerprints/repair/fingerprint.pt" in files
     assert any(f.startswith("adapters/repair/rollback_guard/") for f in files)
-    assert not any("/none/adapter" in f for f in files)            # drifted adapter never published
+    assert not any("/none/adapter" in f for f in files)  # drifted adapter never published
     assert not any(f.endswith("generations.jsonl") for f in files)
 
 
 def test_hub_refuses_drifted_adapters(tmp_path):
-    r = subprocess.run([sys.executable, str(ROOT / "scripts" / "publish_hub.py"), "--repo", "x/y",
-                        "--results", str(_fake_results(tmp_path)), "--adapters", "none"],
-                       capture_output=True, text=True)
+    r = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "publish_hub.py"),
+            "--repo",
+            "x/y",
+            "--results",
+            str(_fake_results(tmp_path)),
+            "--adapters",
+            "none",
+        ],
+        capture_output=True,
+        text=True,
+    )
     assert r.returncode != 0 and "refusing" in (r.stderr + r.stdout)
 
 
@@ -66,5 +77,5 @@ def test_pipeline_layout_and_work_dir(tmp_path):
     (r / "_work" / "pipeline" / "manifest.json").write_text("{}")
     files = collect(r, tmp_path / "stage", ["brink"])
     assert any("adapters/brink/" in f for f in files)
-    assert not any("/naive/" in f for f in files)               # the unprotected pipeline model stays private
+    assert not any("/naive/" in f for f in files)  # the unprotected pipeline model stays private
     assert not any(f.endswith(("raw.jsonl", "manifest.json")) for f in files)

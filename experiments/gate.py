@@ -23,14 +23,13 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from brink.analysis.gate import analyze  # noqa: E402
-from brink.data import GateData, build_gate_data  # noqa: E402
-from brink.eval.behavioral import make_judge  # noqa: E402
-from brink.gate.scorer import GateScorer  # noqa: E402
-from brink.runner import calibrate_or_load, release_gpu, run_condition  # noqa: E402
-from brink.utils import CsvLog, read_csv, set_seed, write_json, write_jsonl  # noqa: E402
-from experiments.go_nogo import make_loader  # noqa: E402
-
+from brink.analysis.gate import analyze
+from brink.data import GateData, build_gate_data
+from brink.eval.behavioral import make_judge
+from brink.gate.scorer import GateScorer
+from brink.runner import calibrate_or_load, release_gpu, run_condition
+from brink.utils import CsvLog, read_csv, set_seed, write_json, write_jsonl
+from experiments.go_nogo import make_loader
 
 SCORE_PREFIXES = ("grad_", "rep", "random", "classifier")
 
@@ -45,7 +44,7 @@ def classifier_scores(judge, pool: list[dict], batch: int = 64) -> np.ndarray | 
         return None
     out = []
     for i in range(0, len(pool), batch):
-        chunk = pool[i:i + batch]
+        chunk = pool[i : i + batch]
         res = judge([r["user"] for r in chunk], [r["assistant"] for r in chunk])
         out += [1.0 if r.get("harmful") else 0.0 for r in res]
     return np.asarray(out)
@@ -56,13 +55,29 @@ def score_pool(out_dir: Path, data: GateData, fp, loader, gc: dict, seed: int, j
     path = out_dir / "scores.csv"
     if path.exists():
         print("[gate] reusing scores.csv", flush=True)
-        return [k for k in read_csv(path)[0] if k.startswith(SCORE_PREFIXES) and not k.startswith("grad_dot")
-                and k != "grad_norm"]
+        return [
+            k
+            for k in read_csv(path)[0]
+            if k.startswith(SCORE_PREFIXES) and not k.startswith("grad_dot") and k != "grad_norm"
+        ]
     model, tok = loader()
     t0 = time.time()
-    scorer = GateScorer(model, tok, fp, data.harmful_probe, data.harmless_probe, gc["targets"], gc["lora_r"],
-                        gc["lora_alpha"], gc["max_len"], gc["batch_size"], seed)
-    print(f"[gate] target gradients ready in {scorer.target_seconds:.0f}s; scoring {len(data.pool)} samples", flush=True)
+    scorer = GateScorer(
+        model,
+        tok,
+        fp,
+        data.harmful_probe,
+        data.harmless_probe,
+        gc["targets"],
+        gc["lora_r"],
+        gc["lora_alpha"],
+        gc["max_len"],
+        gc["batch_size"],
+        seed,
+    )
+    print(
+        f"[gate] target gradients ready in {scorer.target_seconds:.0f}s; scoring {len(data.pool)} samples", flush=True
+    )
     pairs = [(r["user"], r["assistant"]) for r in data.pool]
     s = scorer.score(pairs)
     t_grad = time.time() - t0
@@ -72,9 +87,13 @@ def score_pool(out_dir: Path, data: GateData, fp, loader, gc: dict, seed: int, j
     cls = classifier_scores(judge, data.pool) if gc.get("classifier_baseline", True) else None
     if cls is not None:
         s["classifier"] = cls
-    timing = {"grad_seconds": round(t_grad, 1), "rep_seconds": round(t_cls - t0 - t_grad, 1),
-              "classifier_seconds": round(time.time() - t_cls, 1) if cls is not None else None,
-              "per_sample_grad_seconds": round(t_grad / len(pairs), 3), "n": len(pairs)}
+    timing = {
+        "grad_seconds": round(t_grad, 1),
+        "rep_seconds": round(t_cls - t0 - t_grad, 1),
+        "classifier_seconds": round(time.time() - t_cls, 1) if cls is not None else None,
+        "per_sample_grad_seconds": round(t_grad / len(pairs), 3),
+        "n": len(pairs),
+    }
     write_json(out_dir / "scoring_time.json", timing)
     print(f"[gate] scoring done: {timing}", flush=True)
 

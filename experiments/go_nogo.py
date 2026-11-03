@@ -21,17 +21,18 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from brink.analysis.go_nogo import analyze  # noqa: E402
-from brink.data import GoNoGoData, build_go_nogo_data  # noqa: E402
-from brink.eval.behavioral import make_judge  # noqa: E402
-from brink.runner import calibrate_or_load, run_condition, run_name, seeds_of  # noqa: E402
-from brink.utils import load_model_and_tokenizer, set_seed, write_json  # noqa: E402
+from brink.analysis.go_nogo import analyze
+from brink.data import GoNoGoData, build_go_nogo_data
+from brink.eval.behavioral import make_judge
+from brink.runner import calibrate_or_load, run_condition, run_name, seeds_of
+from brink.utils import load_model_and_tokenizer, set_seed, write_json
 
 
 def make_loader(cfg: dict):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    return lambda: load_model_and_tokenizer(cfg["model"]["id"], device,
-                                            trust_remote_code=cfg["model"].get("trust_remote_code", False))
+    return lambda: load_model_and_tokenizer(
+        cfg["model"]["id"], device, trust_remote_code=cfg["model"].get("trust_remote_code", False)
+    )
 
 
 def run(cfg: dict, out_dir: Path, data: GoNoGoData | None = None, loader=None, judge=None) -> dict:

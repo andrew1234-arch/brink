@@ -28,15 +28,34 @@ def setup(tmp_path_factory):
     d = _tiny_model_dir(tmp_path_factory.mktemp("m"))
     data = _data()
     model, tok = load_model_and_tokenizer(str(d), torch.device("cpu"))
-    fp, base = calibrate(model, tok, data.harmful_cal, data.harmless_cal, data.harmful_probe, data.harmless_probe,
-                         batch_size=4, n_tokens=3, n_bootstrap=10)
+    fp, base = calibrate(
+        model,
+        tok,
+        data.harmful_cal,
+        data.harmless_cal,
+        data.harmful_probe,
+        data.harmless_probe,
+        batch_size=4,
+        n_tokens=3,
+        n_bootstrap=10,
+    )
     return d, data, fp, base
 
 
 def _scorer(d, data, fp, targets=("S3", "S1")):
     model, tok = load_model_and_tokenizer(str(d), torch.device("cpu"))
-    return GateScorer(model, tok, fp, data.harmful_probe, data.harmless_probe, targets=targets,
-                      lora_r=4, lora_alpha=8, max_len=64, batch_size=4)
+    return GateScorer(
+        model,
+        tok,
+        fp,
+        data.harmful_probe,
+        data.harmless_probe,
+        targets=targets,
+        lora_r=4,
+        lora_alpha=8,
+        max_len=64,
+        batch_size=4,
+    )
 
 
 def test_objective_matches_monitor_signal(setup):
@@ -121,11 +140,24 @@ def test_gate_experiment_end_to_end(tmp_path):
 
     d = _tiny_model_dir(tmp_path)
     g = _data()
-    pool = [{"id": f"b{i}", "user": u, "assistant": a, "source": "benign"}
-            for i, (u, a) in enumerate(g.train["control"][:12] * 2)]
-    pool += [{"id": f"p{i}", "user": u, "assistant": a, "source": "planted"} for i, (u, a) in enumerate(g.train["pos"][:4])]
-    data = GateData(g.harmful_cal, g.harmless_cal, g.harmful_probe, g.harmless_probe, g.eval_harmful, pool,
-                    g.train["pos"][4:8], g.train["control"][12:16], g.train["control"][:4])
+    pool = [
+        {"id": f"b{i}", "user": u, "assistant": a, "source": "benign"}
+        for i, (u, a) in enumerate(g.train["control"][:12] * 2)
+    ]
+    pool += [
+        {"id": f"p{i}", "user": u, "assistant": a, "source": "planted"} for i, (u, a) in enumerate(g.train["pos"][:4])
+    ]
+    data = GateData(
+        g.harmful_cal,
+        g.harmless_cal,
+        g.harmful_probe,
+        g.harmless_probe,
+        g.eval_harmful,
+        pool,
+        g.train["pos"][4:8],
+        g.train["control"][12:16],
+        g.train["control"][:4],
+    )
     cfg = yaml.safe_load((ROOT / "configs" / "gate.yaml").read_text())
     cfg["probe"].update(batch_size=4, n_tokens=3, bootstrap=10, every=2)
     cfg["gate"].update(lora_r=4, lora_alpha=8, max_len=64)
@@ -136,8 +168,18 @@ def test_gate_experiment_end_to_end(tmp_path):
 
     s = run(cfg, tmp_path / "out", data=data, loader=loader, judge=KeywordJudge())
     out = tmp_path / "out"
-    for f in ["scores.csv", "pool.jsonl", "subsets.json", "summary.json", "REPORT.md", "gate.png",
-              "top/evals.csv", "random/probe.csv", "bottom/DONE", "scoring_time.json"]:
+    for f in [
+        "scores.csv",
+        "pool.jsonl",
+        "subsets.json",
+        "summary.json",
+        "REPORT.md",
+        "gate.png",
+        "top/evals.csv",
+        "random/probe.csv",
+        "bottom/DONE",
+        "scoring_time.json",
+    ]:
         assert (out / f).exists(), f
     assert set(s["detection"]) == {"grad_S3", "grad_S1", "rep", "random"}
     assert "heldout_loss" in (out / "top" / "evals.csv").read_text().splitlines()[0]

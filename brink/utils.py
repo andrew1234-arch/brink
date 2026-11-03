@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import contextlib
 import random
-from typing import Iterator, Sequence
+from collections.abc import Iterator, Sequence
 
 import numpy as np
 import torch
 
-
 # --------------------------------------------------------------------------- reproducibility
+
 
 def set_seed(seed: int) -> None:
     random.seed(seed)
@@ -21,6 +21,7 @@ def set_seed(seed: int) -> None:
 
 
 # --------------------------------------------------------------------------- precision
+
 
 def amp_dtype(device: torch.device) -> torch.dtype | None:
     """Mixed-precision dtype for a device. T4 / P100 (Kaggle) have no fast bf16, so they get fp16."""
@@ -46,8 +47,10 @@ def autocast(device: torch.device):
 
 # --------------------------------------------------------------------------- loading
 
-def load_model_and_tokenizer(model_id: str, device: torch.device, dtype: torch.dtype | None = None,
-                             trust_remote_code: bool = False):
+
+def load_model_and_tokenizer(
+    model_id: str, device: torch.device, dtype: torch.dtype | None = None, trust_remote_code: bool = False
+):
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     dtype = dtype or weights_dtype(device)
@@ -58,8 +61,7 @@ def load_model_and_tokenizer(model_id: str, device: torch.device, dtype: torch.d
     try:
         model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype, trust_remote_code=trust_remote_code)
     except TypeError:  # older transformers
-        model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=dtype,
-                                                     trust_remote_code=trust_remote_code)
+        model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=dtype, trust_remote_code=trust_remote_code)
     if next(model.parameters()).dtype != dtype:
         model = model.to(dtype)
     model.to(device).eval()
@@ -67,6 +69,7 @@ def load_model_and_tokenizer(model_id: str, device: torch.device, dtype: torch.d
 
 
 # --------------------------------------------------------------------------- chat formatting
+
 
 def _messages(user: str, system: str | None) -> list[dict]:
     msgs = [{"role": "system", "content": system}] if system else []
@@ -81,18 +84,20 @@ def format_prompt(tok, user: str, system: str | None = None) -> str:
 def format_conversation(tok, user: str, assistant: str, system: str | None = None) -> tuple[str, str]:
     """Return (prompt_text, completion_text) so the completion can be loss-masked separately."""
     prompt = format_prompt(tok, user, system)
-    full = tok.apply_chat_template(_messages(user, system) + [{"role": "assistant", "content": assistant}],
-                                   tokenize=False)
+    full = tok.apply_chat_template(
+        _messages(user, system) + [{"role": "assistant", "content": assistant}], tokenize=False
+    )
     if full.startswith(prompt):
-        return prompt, full[len(prompt):]
+        return prompt, full[len(prompt) :]
     return prompt, assistant + (tok.eos_token or "")
 
 
 # --------------------------------------------------------------------------- iteration
 
+
 def batched(items: Sequence, n: int) -> Iterator[Sequence]:
     for i in range(0, len(items), n):
-        yield items[i:i + n]
+        yield items[i : i + n]
 
 
 # --------------------------------------------------------------------------- logging (torch-free, re-exported)

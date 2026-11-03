@@ -43,16 +43,25 @@ def _load_cpu(model_or_id, dtype=torch.float16):
         return AutoModelForCausalLM.from_pretrained(str(model_or_id), torch_dtype=dtype, low_cpu_mem_usage=True)
 
 
-def resta(model, base, aligned, alpha: float = 0.25, dare: bool = True, dare_drop_rate: float | None = None,
-          seed: int = 0):
+def resta(
+    model, base, aligned, alpha: float = 0.25, dare: bool = True, dare_drop_rate: float | None = None, seed: int = 0
+):
     """Apply ReSta in place. `base` / `aligned` are model ids, paths or loaded modules (kept on CPU)."""
     from safetune.runner.recover import ReStaTrainer
 
     model = merge_lora(model)
     base_m, aligned_m = _load_cpu(base), _load_cpu(aligned)
     try:
-        out = ReStaTrainer(model, base_model=base_m, aligned_model=aligned_m, alpha=alpha, dare=dare,
-                           dare_drop_rate=dare_drop_rate, dare_seed=seed, device="cpu").apply()
+        out = ReStaTrainer(
+            model,
+            base_model=base_m,
+            aligned_model=aligned_m,
+            alpha=alpha,
+            dare=dare,
+            dare_drop_rate=dare_drop_rate,
+            dare_seed=seed,
+            device="cpu",
+        ).apply()
     finally:
         del base_m, aligned_m
     return out
@@ -72,7 +81,8 @@ def ReferenceSteer(model, fp, strength: float):
     from safetune.interventions.steer.refusal_direction import RefusalDirectionModel
 
     layer = max(0, fp.layer - 1)
-    wrapped = RefusalDirectionModel(model, direction=fp.directions[fp.layer].float(), mode="steer",
-                                    strength=float(strength), layers=[layer])
+    wrapped = RefusalDirectionModel(
+        model, direction=fp.directions[fp.layer].float(), mode="steer", strength=float(strength), layers=[layer]
+    )
     with wrapped:
         yield model

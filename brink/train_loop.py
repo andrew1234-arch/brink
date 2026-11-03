@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 import random
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import torch
 
@@ -18,8 +18,16 @@ from brink.data import collate
 from brink.utils import CsvLog, amp_dtype
 
 
-def lora_sft(model, tok, examples: list[tuple[list[int], list[int]]], cfg: dict, seed: int,
-             on_step: Callable | None = None, log: CsvLog | None = None, controller=None):
+def lora_sft(
+    model,
+    tok,
+    examples: list[tuple[list[int], list[int]]],
+    cfg: dict,
+    seed: int,
+    on_step: Callable | None = None,
+    log: CsvLog | None = None,
+    controller=None,
+):
     """LoRA SFT. `on_step(model, step)` runs after every optimizer step (and at step 0).
 
     `controller` (optional, e.g. brink.repair.RepairController) can additionally:
@@ -34,10 +42,15 @@ def lora_sft(model, tok, examples: list[tuple[list[int], list[int]]], cfg: dict,
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         model.config.use_cache = False
     model.enable_input_require_grads()
-    lcfg = LoraConfig(r=cfg["lora_r"], lora_alpha=cfg["lora_alpha"], lora_dropout=cfg["lora_dropout"],
-                      target_modules=cfg.get("target_modules", "all-linear"), task_type="CAUSAL_LM")
+    lcfg = LoraConfig(
+        r=cfg["lora_r"],
+        lora_alpha=cfg["lora_alpha"],
+        lora_dropout=cfg["lora_dropout"],
+        target_modules=cfg.get("target_modules", "all-linear"),
+        task_type="CAUSAL_LM",
+    )
     model = get_peft_model(model, lcfg)
-    for p in model.parameters():          # LoRA params in fp32 for stable fp16 AMP
+    for p in model.parameters():  # LoRA params in fp32 for stable fp16 AMP
         if p.requires_grad:
             p.data = p.data.float()
 
@@ -58,12 +71,12 @@ def lora_sft(model, tok, examples: list[tuple[list[int], list[int]]], cfg: dict,
         nonlocal order
         if len(order) < cfg["micro_batch"]:
             order = order + rng.sample(range(len(examples)), len(examples))
-        idx, order = order[:cfg["micro_batch"]], order[cfg["micro_batch"]:]
+        idx, order = order[: cfg["micro_batch"]], order[cfg["micro_batch"] :]
         b = collate([examples[i] for i in idx], tok.pad_token_id)
         return {k: v.to(device) for k, v in b.items()}
 
     model.train()
-    if on_step and on_step(model, 0) == "stop":      # step 0: LoRA B = 0, so this is the reference model
+    if on_step and on_step(model, 0) == "stop":  # step 0: LoRA B = 0, so this is the reference model
         return model
     for step in range(1, cfg["max_steps"] + 1):
         t0 = time.time()
@@ -92,8 +105,14 @@ def lora_sft(model, tok, examples: list[tuple[list[int], list[int]]], cfg: dict,
         opt.zero_grad(set_to_none=True)
         sched.step()
         if log:
-            log.write({"step": step, "loss": round(total, 5), "lr": sched.get_last_lr()[0],
-                       "step_seconds": round(time.time() - t0, 3)})
+            log.write(
+                {
+                    "step": step,
+                    "loss": round(total, 5),
+                    "lr": sched.get_last_lr()[0],
+                    "step_seconds": round(time.time() - t0, 3),
+                }
+            )
         if step % 10 == 0:
             print(f"[train] step {step}/{cfg['max_steps']} loss={total:.4f}", flush=True)
         if on_step and on_step(model, step) == "stop":

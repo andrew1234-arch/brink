@@ -5,7 +5,7 @@ Imports are lazy so torch-free consumers (the dashboard) can use `brink.monitor.
 
 from brink.monitor.detector import cusum_alarm, first_alarm
 
-__all__ = ["Monitor", "first_alarm", "cusum_alarm"]
+__all__ = ["Monitor", "cusum_alarm", "first_alarm"]
 
 
 def __getattr__(name):

@@ -28,21 +28,28 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from brink.analysis.repair import analyze  # noqa: E402
-from brink.data import RepairData, build_repair_data, tokenize_sft  # noqa: E402
-from brink.eval.behavioral import evaluate_behavior, evaluate_over_refusal, make_judge  # noqa: E402
-from brink.eval.audit import redteam as auditkit_redteam  # noqa: E402
-from brink.eval.capability import heldout_loss  # noqa: E402
-from brink.monitor.core import Monitor  # noqa: E402
-from brink.probe import Prober  # noqa: E402
-from brink.repair import ErosionGuard, RepairController  # noqa: E402
-from brink.runner import calibrate_or_load, release_gpu  # noqa: E402
-from brink.train_loop import lora_sft  # noqa: E402
-from brink.utils import CsvLog, set_seed, write_json  # noqa: E402
-from experiments.go_nogo import make_loader  # noqa: E402
+from brink.analysis.repair import analyze
+from brink.data import RepairData, build_repair_data, tokenize_sft
+from brink.eval.audit import redteam as auditkit_redteam
+from brink.eval.behavioral import evaluate_behavior, evaluate_over_refusal, make_judge
+from brink.eval.capability import heldout_loss
+from brink.monitor.core import Monitor
+from brink.probe import Prober
+from brink.repair import ErosionGuard, RepairController
+from brink.runner import calibrate_or_load, release_gpu
+from brink.train_loop import lora_sft
+from brink.utils import CsvLog, set_seed, write_json
+from experiments.go_nogo import make_loader
 
-POLICY_OF = {"safety_mix": "log", "none": "log", "halt": "halt", "rollback": "rollback", "guard": "guard",
-             "rollback_guard": "rollback_guard", "guard_always": "guard_always"}
+POLICY_OF = {
+    "safety_mix": "log",
+    "none": "log",
+    "halt": "halt",
+    "rollback": "rollback",
+    "guard": "guard",
+    "rollback_guard": "rollback_guard",
+    "guard_always": "guard_always",
+}
 
 
 def make_evaluator(tok, data: RepairData, judge, cfg: dict):
@@ -50,10 +57,12 @@ def make_evaluator(tok, data: RepairData, judge, cfg: dict):
 
     def evaluator(m):
         metrics, records = evaluate_behavior(m, tok, data.eval_harmful, judge, ec["max_new_tokens"], ec["batch_size"])
-        metrics["over_refusal"] = evaluate_over_refusal(m, tok, data.harmless_eval, judge,
-                                                        ec.get("over_refusal_max_new_tokens", 64), ec["batch_size"])
+        metrics["over_refusal"] = evaluate_over_refusal(
+            m, tok, data.harmless_eval, judge, ec.get("over_refusal_max_new_tokens", 64), ec["batch_size"]
+        )
         metrics["heldout_loss"] = heldout_loss(m, tok, data.heldout_benign, tc["max_len"], ec.get("loss_batch_size", 4))
         return metrics, records
+
     return evaluator
 
 
@@ -68,8 +77,10 @@ def resolve_threshold(ac: dict) -> float:
     path = Path(ac.get("calibration_from", "results/go_nogo/summary.json"))
     try:
         cal = json.loads(path.read_text())["calibration"][ac["signal"]]
-        print(f"[alarm] using control-calibrated threshold {cal['threshold']:.2f} for {ac['signal']} from {path}",
-              flush=True)
+        print(
+            f"[alarm] using control-calibrated threshold {cal['threshold']:.2f} for {ac['signal']} from {path}",
+            flush=True,
+        )
         return float(cal["threshold"])
     except (FileNotFoundError, KeyError, json.JSONDecodeError):
         print(f"[alarm] WARNING: no calibration at {path}; falling back to -3.0. Run go / no-go first.", flush=True)
@@ -81,8 +92,9 @@ def final_redteam(model, tok, cdir: Path, cfg: dict) -> None:
     if not cfg["eval"].get("redteam", True):
         return
     try:
-        res = auditkit_redteam(model, tok, max_new_tokens=cfg["eval"]["max_new_tokens"],
-                               batch_size=cfg["eval"]["batch_size"])
+        res = auditkit_redteam(
+            model, tok, max_new_tokens=cfg["eval"]["max_new_tokens"], batch_size=cfg["eval"]["batch_size"]
+        )
     except ImportError:
         res = {"skipped": "auditkit not installed"}
     write_json(cdir / "redteam.json", res)
@@ -98,18 +110,44 @@ def train_condition(name: str, out_dir: Path, fp, loader, data: RepairData, judg
     set_seed(seed)
     model, tok = loader()
     prober = Prober(fp, tok, data.harmful_probe, data.harmless_probe, pc["batch_size"])
-    monitor = Monitor(prober, cdir, pc["every"], ec["steps"], make_evaluator(tok, data, judge, cfg),
-                      alarm_signal=ac["signal"], alarm_threshold=ac["threshold"], alarm_persistence=ac["persistence"])
+    monitor = Monitor(
+        prober,
+        cdir,
+        pc["every"],
+        ec["steps"],
+        make_evaluator(tok, data, judge, cfg),
+        alarm_signal=ac["signal"],
+        alarm_threshold=ac["threshold"],
+        alarm_persistence=ac["persistence"],
+    )
     policy = POLICY_OF[name]
-    guard = (ErosionGuard(tok, fp, data.harmful_probe, data.harmless_probe, rc["guard_target"],
-                          rc["guard_refresh_every"], rc["guard_batch_size"]) if "guard" in policy else None)
+    guard = (
+        ErosionGuard(
+            tok,
+            fp,
+            data.harmful_probe,
+            data.harmless_probe,
+            rc["guard_target"],
+            rc["guard_refresh_every"],
+            rc["guard_batch_size"],
+        )
+        if "guard" in policy
+        else None
+    )
     ctl = RepairController(monitor, policy, guard=guard)
     t0 = time.time()
     pairs = data.train_safety_mix if name == "safety_mix" else data.train
     if not pairs:
         raise ValueError(f"[{name}] no training pairs (safety_mix needs RepairData.train_safety_mix)")
-    model = lora_sft(model, tok, tokenize_sft(tok, pairs, cfg["train"]["max_len"]), cfg["train"], seed,
-                     log=CsvLog(cdir / "train.csv"), controller=ctl)
+    model = lora_sft(
+        model,
+        tok,
+        tokenize_sft(tok, pairs, cfg["train"]["max_len"]),
+        cfg["train"],
+        seed,
+        log=CsvLog(cdir / "train.csv"),
+        controller=ctl,
+    )
     summary = {**ctl.summary(), "train_seconds": round(time.time() - t0, 1)}
     write_json(cdir / "repair.json", summary)
     final_redteam(model, tok, cdir, cfg)
@@ -148,8 +186,14 @@ def posthoc_condition(name: str, out_dir: Path, fp, loader, data: RepairData, ju
             final_redteam(model, tok, cdir, cfg)
     elif name == "posthoc_resta":
         rs = rc["resta"]
-        model = resta(model, rs["base_id"], rs.get("aligned_id") or cfg["model"]["id"], alpha=rs["alpha"],
-                      dare=rs.get("dare", True), seed=cfg.get("seed", 0))
+        model = resta(
+            model,
+            rs["base_id"],
+            rs.get("aligned_id") or cfg["model"]["id"],
+            alpha=rs["alpha"],
+            dare=rs.get("dare", True),
+            seed=cfg.get("seed", 0),
+        )
         info.update(alpha=rs["alpha"], base_id=rs["base_id"])
         sig = prober(model)
         metrics, _ = evaluator(model)

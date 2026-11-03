@@ -30,8 +30,8 @@ from brink.probe.fingerprint import SafetyFingerprint
 from brink.probe.signals import _lse_gap
 from brink.utils import amp_dtype, batched, format_prompt
 
-
 # --------------------------------------------------------------------------- LoRA for scoring
+
 
 def wrap_lora_for_scoring(model, r: int = 8, alpha: int = 16, target_modules="all-linear", seed: int = 0):
     """Fresh LoRA adapters (dropout 0, deterministic init). Train mode only so gradient checkpointing applies."""
@@ -41,8 +41,9 @@ def wrap_lora_for_scoring(model, r: int = 8, alpha: int = 16, target_modules="al
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.config.use_cache = False
     model.enable_input_require_grads()
-    peft_model = get_peft_model(model, LoraConfig(r=r, lora_alpha=alpha, lora_dropout=0.0,
-                                                  target_modules=target_modules, task_type="CAUSAL_LM"))
+    peft_model = get_peft_model(
+        model, LoraConfig(r=r, lora_alpha=alpha, lora_dropout=0.0, target_modules=target_modules, task_type="CAUSAL_LM")
+    )
     for p in peft_model.parameters():
         if p.requires_grad:
             p.data = p.data.float()
@@ -66,6 +67,7 @@ def _loss_scale(device) -> float:
 
 # --------------------------------------------------------------------------- objective J
 
+
 def _forward_last(model, tok, texts: list[str]):
     device = next(model.parameters()).device
     old = tok.padding_side
@@ -73,17 +75,30 @@ def _forward_last(model, tok, texts: list[str]):
     enc = tok(texts, return_tensors="pt", padding=True, add_special_tokens=False).to(device)
     tok.padding_side = old
     pos = (enc.attention_mask.cumsum(-1) - 1).clamp(min=0)
-    kw = {"input_ids": enc.input_ids, "attention_mask": enc.attention_mask, "position_ids": pos,
-          "output_hidden_states": True, "use_cache": False}
+    kw = {
+        "input_ids": enc.input_ids,
+        "attention_mask": enc.attention_mask,
+        "position_ids": pos,
+        "output_hidden_states": True,
+        "use_cache": False,
+    }
     try:
         return model(**kw, logits_to_keep=1)
     except TypeError:
         return model(**kw)
 
 
-def objective_terms(model, tok, fp: SafetyFingerprint, harmful: list[str], harmless: list[str],
-                    target: str = "S3", batch_size: int = 4, backward: bool = True,
-                    formatted: bool = False) -> float:
+def objective_terms(
+    model,
+    tok,
+    fp: SafetyFingerprint,
+    harmful: list[str],
+    harmless: list[str],
+    target: str = "S3",
+    batch_size: int = 4,
+    backward: bool = True,
+    formatted: bool = False,
+) -> float:
     """Compute J (and accumulate dJ/dtheta into .grad if backward). J is linear in per-prompt terms,
     so batches are back-propagated one at a time.
 
@@ -143,8 +158,10 @@ def objective_gradient(model, tok, fp, harmful, harmless, target="S3", batch_siz
 
 # --------------------------------------------------------------------------- per-sample scores
 
-def grad_scores(model, tok, pairs: list[Pair], targets: dict[str, list[torch.Tensor]], max_len: int = 1024,
-                log_every: int = 100) -> dict[str, np.ndarray]:
+
+def grad_scores(
+    model, tok, pairs: list[Pair], targets: dict[str, list[torch.Tensor]], max_len: int = 1024, log_every: int = 100
+) -> dict[str, np.ndarray]:
     """One backward per sample, scored against every target gradient.
 
     Returns per target T: grad_T = cos(grad L(x), grad J_T) and grad_dot_T = <grad L(x), grad J_T>
@@ -156,8 +173,10 @@ def grad_scores(model, tok, pairs: list[Pair], targets: dict[str, list[torch.Ten
     t_norm = {t: math.sqrt(sum(float((g * g).sum()) for g in gs)) for t, gs in targets.items()}
     examples = tokenize_sft(tok, pairs, max_len)
     if len(examples) != len(pairs):
-        raise ValueError(f"{len(pairs) - len(examples)} samples dropped by tokenize_sft (prompt too long?); "
-                         "raise max_len so every sample is scored")
+        raise ValueError(
+            f"{len(pairs) - len(examples)} samples dropped by tokenize_sft (prompt too long?); "
+            "raise max_len so every sample is scored"
+        )
     n = len(examples)
     out_arrays = {k: np.zeros(n) for t in targets for k in (f"grad_{t}", f"grad_dot_{t}")}
     out_arrays.update(grad_norm=np.zeros(n), loss=np.zeros(n))
@@ -201,7 +220,7 @@ def reply_states(model, tok, pairs: list[Pair], layer: int, max_len: int = 1024,
     rows = []
     try:
         for chunk in batched(examples, batch_size):
-            b = collate(list(chunk), tok.pad_token_id)          # right padding: positions are already correct
+            b = collate(list(chunk), tok.pad_token_id)  # right padding: positions are already correct
             b = {k: v.to(device) for k, v in b.items()}
             reply = (b.pop("labels") != -100).float()
             with _autocast(device):
@@ -213,8 +232,16 @@ def reply_states(model, tok, pairs: list[Pair], layer: int, max_len: int = 1024,
     return torch.cat(rows)
 
 
-def rep_scores(model, tok, pairs: list[Pair], unsafe: list[Pair], safe: list[Pair], layer: int,
-               max_len: int = 1024, batch_size: int = 4) -> np.ndarray:
+def rep_scores(
+    model,
+    tok,
+    pairs: list[Pair],
+    unsafe: list[Pair],
+    safe: list[Pair],
+    layer: int,
+    max_len: int = 1024,
+    batch_size: int = 4,
+) -> np.ndarray:
     h = F.normalize(reply_states(model, tok, pairs, layer, max_len, batch_size), dim=-1)
     mu_u = F.normalize(reply_states(model, tok, unsafe, layer, max_len, batch_size).mean(0), dim=-1)
     mu_s = F.normalize(reply_states(model, tok, safe, layer, max_len, batch_size).mean(0), dim=-1)
@@ -223,22 +250,36 @@ def rep_scores(model, tok, pairs: list[Pair], unsafe: list[Pair], safe: list[Pai
 
 # --------------------------------------------------------------------------- facade
 
+
 class GateScorer:
     """Holds a LoRA-wrapped model and the target gradients; scores any list of (user, assistant) pairs.
 
     `targets` are objectives J (see `objective_terms`); the first one is the primary score.
     """
 
-    def __init__(self, model, tok, fp: SafetyFingerprint, harmful_probe: list[str], harmless_probe: list[str],
-                 targets: tuple[str, ...] | list[str] = ("S3",), lora_r: int = 8, lora_alpha: int = 16,
-                 max_len: int = 1024, batch_size: int = 4, seed: int = 0):
+    def __init__(
+        self,
+        model,
+        tok,
+        fp: SafetyFingerprint,
+        harmful_probe: list[str],
+        harmless_probe: list[str],
+        targets: tuple[str, ...] | list[str] = ("S3",),
+        lora_r: int = 8,
+        lora_alpha: int = 16,
+        max_len: int = 1024,
+        batch_size: int = 4,
+        seed: int = 0,
+    ):
         self.tok, self.fp, self.max_len, self.batch_size = tok, fp, max_len, batch_size
         self.targets = list(targets)
         self.primary = f"grad_{self.targets[0]}"
         self.model = wrap_lora_for_scoring(model, lora_r, lora_alpha, seed=seed)
         t0 = time.time()
-        self.g_targets = {t: objective_gradient(self.model, tok, fp, harmful_probe, harmless_probe, t, batch_size)
-                          for t in self.targets}
+        self.g_targets = {
+            t: objective_gradient(self.model, tok, fp, harmful_probe, harmless_probe, t, batch_size)
+            for t in self.targets
+        }
         self.target_seconds = time.time() - t0
 
     def score(self, pairs: list[Pair], log_every: int = 100) -> dict[str, np.ndarray]:
@@ -252,12 +293,13 @@ class GateScorer:
 
 # --------------------------------------------------------------------------- selection
 
+
 def drop_mask(scores: np.ndarray, drop_frac: float | None = None, threshold: float | None = None) -> np.ndarray:
     """True where a sample should be dropped: the top `drop_frac` by score, or score > threshold."""
     scores = np.asarray(scores, float)
     if threshold is not None:
         return scores > threshold
-    k = int(round(len(scores) * (drop_frac or 0.0)))
+    k = round(len(scores) * (drop_frac or 0.0))
     mask = np.zeros(len(scores), bool)
     if k > 0:
         mask[np.argsort(-scores, kind="stable")[:k]] = True

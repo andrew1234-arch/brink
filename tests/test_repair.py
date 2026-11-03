@@ -25,8 +25,17 @@ def setup(tmp_path_factory):
     d = _tiny_model_dir(tmp_path_factory.mktemp("m"))
     data = _data()
     model, tok = load_model_and_tokenizer(str(d), torch.device("cpu"))
-    fp, base = calibrate(model, tok, data.harmful_cal, data.harmless_cal, data.harmful_probe, data.harmless_probe,
-                         batch_size=4, n_tokens=3, n_bootstrap=10)
+    fp, base = calibrate(
+        model,
+        tok,
+        data.harmful_cal,
+        data.harmless_cal,
+        data.harmful_probe,
+        data.harmless_probe,
+        batch_size=4,
+        n_tokens=3,
+        n_bootstrap=10,
+    )
     return d, data, fp, base
 
 
@@ -130,15 +139,33 @@ def test_controller_policies(setup, tmp_path, policy):
     d, data, fp, _ = setup
     model, tok = load_model_and_tokenizer(str(d), torch.device("cpu"))
     prober = Prober(fp, tok, data.harmful_probe, data.harmless_probe, 4)
-    mon = Monitor(prober, tmp_path / policy, probe_every=2, eval_steps=[0, 6], evaluator=None,
-                  alarm_signal="S3", alarm_threshold=100.0, alarm_persistence=2)
+    mon = Monitor(
+        prober,
+        tmp_path / policy,
+        probe_every=2,
+        eval_steps=[0, 6],
+        evaluator=None,
+        alarm_signal="S3",
+        alarm_threshold=100.0,
+        alarm_persistence=2,
+    )
     guard = ErosionGuard(tok, fp, data.harmful_probe, data.harmless_probe, "S3", refresh_every=2, batch_size=4)
     ctl = RepairController(mon, policy, guard=guard if "guard" in policy else None)
-    cfg = {"max_steps": 6, "lr": 1e-3, "warmup_steps": 1, "micro_batch": 2, "grad_accum": 1, "max_len": 64,
-           "lora_r": 4, "lora_alpha": 8, "lora_dropout": 0.0, "grad_ckpt": True}
+    cfg = {
+        "max_steps": 6,
+        "lr": 1e-3,
+        "warmup_steps": 1,
+        "micro_batch": 2,
+        "grad_accum": 1,
+        "max_len": 64,
+        "lora_r": 4,
+        "lora_alpha": 8,
+        "lora_dropout": 0.0,
+        "grad_ckpt": True,
+    }
     lora_sft(model, tok, tokenize_sft(tok, data.train["pos"], 64), cfg, 0, controller=ctl)
     s = ctl.summary()
-    assert s["alarm_step"] == 2                          # probes at 0 and 2 both breach the +100 threshold
+    assert s["alarm_step"] == 2  # probes at 0 and 2 both breach the +100 threshold
     events = (tmp_path / policy / "events.csv").read_text()
     assert "alarm" in events
     if policy == "halt":
@@ -167,13 +194,17 @@ def test_reference_steer_restores_projection(setup):
     layer = _get_decoder_layers(model)[fp.layer]
     seen = []
     handle = layer.register_forward_pre_hook(lambda m, args: seen.append(args[0][:, -1, :].detach().clone()))
-    enc = tok([format_prompt(tok, p) for p in data.harmful_probe[:4]], return_tensors="pt", padding=True,
-              add_special_tokens=False)
+    enc = tok(
+        [format_prompt(tok, p) for p in data.harmful_probe[:4]],
+        return_tensors="pt",
+        padding=True,
+        add_special_tokens=False,
+    )
     with torch.no_grad():
         model(**enc)
         with ReferenceSteer(model, fp, strength=0.5):
             model(**enc)
-        model(**enc)                                               # hooks removed afterwards
+        model(**enc)  # hooks removed afterwards
     handle.remove()
     h0, h1, h2 = (x @ r for x in seen)
     assert torch.allclose(h1 - h0, torch.full_like(h0, 0.5), atol=1e-4)
@@ -191,11 +222,12 @@ def test_resta_adds_scaled_safety_vector(setup, tmp_path):
     torch.manual_seed(1)
     with torch.no_grad():
         for p in base.parameters():
-            p.add_(0.01 * torch.randn_like(p))       # safety vector = aligned - base = -noise
+            p.add_(0.01 * torch.randn_like(p))  # safety vector = aligned - base = -noise
         for p in ft.parameters():
-            p.add_(0.02 * torch.randn_like(p))       # the "drift"
-    expected = {k: v.clone() + 0.25 * (aligned.state_dict()[k] - base.state_dict()[k])
-                for k, v in ft.state_dict().items()}
+            p.add_(0.02 * torch.randn_like(p))  # the "drift"
+    expected = {
+        k: v.clone() + 0.25 * (aligned.state_dict()[k] - base.state_dict()[k]) for k, v in ft.state_dict().items()
+    }
     out = resta(ft, base, aligned, alpha=0.25, dare=False)
     for k, v in out.state_dict().items():
         assert torch.allclose(v, expected[k], atol=1e-6), k
@@ -211,7 +243,7 @@ def test_repair_experiment_end_to_end(tmp_path):
     from experiments.repair import run
 
     d = _tiny_model_dir(tmp_path)
-    base_dir = tmp_path / "tiny_base"                          # stand-in "pre-alignment" base for ReSta
+    base_dir = tmp_path / "tiny_base"  # stand-in "pre-alignment" base for ReSta
     base = AutoModelForCausalLM.from_pretrained(str(d))
     torch.manual_seed(3)
     with torch.no_grad():
@@ -220,14 +252,21 @@ def test_repair_experiment_end_to_end(tmp_path):
     base.save_pretrained(base_dir)
 
     g = _data()
-    data = RepairData(g.harmful_cal, g.harmless_cal, g.harmful_probe, g.harmless_probe, g.eval_harmful,
-                      g.train["control"] + g.train["pos"][:4], g.train["control"][:4],
-                      [f"write a poem about the sky {i}" for i in range(4)],
-                      train_safety_mix=g.train["control"] + g.train["pos"][:4] + g.train["control"][-4:])
+    data = RepairData(
+        g.harmful_cal,
+        g.harmless_cal,
+        g.harmful_probe,
+        g.harmless_probe,
+        g.eval_harmful,
+        g.train["control"] + g.train["pos"][:4],
+        g.train["control"][:4],
+        [f"write a poem about the sky {i}" for i in range(4)],
+        train_safety_mix=g.train["control"] + g.train["pos"][:4] + g.train["control"][-4:],
+    )
     cfg = yaml.safe_load((ROOT / "configs" / "repair.yaml").read_text())
     cfg["model"]["id"] = str(d)
     cfg["probe"].update(batch_size=4, n_tokens=3, bootstrap=10, every=2)
-    cfg["alarm"]["threshold"] = 100.0                          # force the alarm so every policy acts
+    cfg["alarm"]["threshold"] = 100.0  # force the alarm so every policy acts
     cfg["repair"].update(guard_refresh_every=2, guard_batch_size=4)
     cfg["repair"]["resta"]["base_id"] = str(base_dir)
     cfg["eval"].update(steps=[0, 3, 6], max_new_tokens=4, over_refusal_max_new_tokens=4, batch_size=4)
@@ -246,6 +285,7 @@ def test_repair_experiment_end_to_end(tmp_path):
     for f in ["REPORT.md", "summary.json", "repair.png", "none/adapter/adapter_config.json", "halt/events.csv"]:
         assert (out / f).exists(), f
     import json as _json
+
     rt = _json.loads((out / "rollback_guard" / "redteam.json").read_text())
     assert rt["redteam_n"] == 26 and 0 <= rt["redteam_attack_resistance"] <= 1
     assert "AuditKIT attacks resisted" in (out / "REPORT.md").read_text()

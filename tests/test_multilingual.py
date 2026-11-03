@@ -23,8 +23,9 @@ def test_multilingual_end_to_end(tmp_path):
     d = _tiny_model_dir(tmp_path)
     g = _data()
     base = LangSets(g.harmful_cal, g.harmless_cal, g.harmful_probe, g.harmless_probe, g.eval_harmful)
-    rot = LangSets(g.harmful_cal[::-1], g.harmless_cal[::-1], g.harmful_probe[::-1], g.harmless_probe[::-1],
-                   g.eval_harmful[::-1])
+    rot = LangSets(
+        g.harmful_cal[::-1], g.harmless_cal[::-1], g.harmful_probe[::-1], g.harmless_probe[::-1], g.eval_harmful[::-1]
+    )
     data = MultilingualData({"en": base, "hi": rot, "tl": base}, {"pos": g.train["pos"], "control": g.train["control"]})
     cfg = yaml.safe_load((ROOT / "configs" / "multilingual.yaml").read_text())
     cfg["probe"].update(batch_size=4, n_tokens=3, bootstrap=10, every=2)
@@ -43,6 +44,7 @@ def test_multilingual_end_to_end(tmp_path):
         assert (out / f).exists(), f
     assert set(s["conditions"]["pos"]["languages"]) == {"en", "hi", "tl"}
     import csv
+
     for row in csv.DictReader((out / "pos" / "probe.csv").open()):
         zs = [float(row[k]) for k in ("z_S3", "hi:z_S3", "tl:z_S3")]
         assert abs(float(row["z_S3_worst"]) - min(zs)) < 1e-9

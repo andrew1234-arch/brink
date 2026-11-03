@@ -16,10 +16,19 @@ from brink.io import CsvLog, write_jsonl
 
 
 class Monitor:
-    def __init__(self, prober: Callable, out_dir: Path, probe_every: int = 4,
-                 eval_steps: list[int] | None = None, evaluator: Callable | None = None,
-                 save_generations: bool = True, alarm_signal: str | None = None,
-                 alarm_threshold: float = -3.0, alarm_persistence: int = 2, cheap_check: Callable | None = None):
+    def __init__(
+        self,
+        prober: Callable,
+        out_dir: Path,
+        probe_every: int = 4,
+        eval_steps: list[int] | None = None,
+        evaluator: Callable | None = None,
+        save_generations: bool = True,
+        alarm_signal: str | None = None,
+        alarm_threshold: float = -3.0,
+        alarm_persistence: int = 2,
+        cheap_check: Callable | None = None,
+    ):
         self.prober, self.evaluator = prober, evaluator
         # Baseline monitor: a small behavioural check (few prompts, short replies, keyword judge) at every probe
         # step, so Brink's probe can be compared with "just run a cheap judge every N steps" on cost and lead.
@@ -30,11 +39,15 @@ class Monitor:
         self.probe_log = CsvLog(self.out_dir / "probe.csv")
         self.eval_log = CsvLog(self.out_dir / "evals.csv")
         self.event_log = CsvLog(self.out_dir / "events.csv")
-        self.gen_path = self.out_dir / "generations.jsonl"   # git-ignored: may contain harmful text
+        self.gen_path = self.out_dir / "generations.jsonl"  # git-ignored: may contain harmful text
         self.save_generations = save_generations
         if self.gen_path.exists():
             self.gen_path.unlink()
-        self.alarm_signal, self.alarm_threshold, self.alarm_persistence = alarm_signal, alarm_threshold, alarm_persistence
+        self.alarm_signal, self.alarm_threshold, self.alarm_persistence = (
+            alarm_signal,
+            alarm_threshold,
+            alarm_persistence,
+        )
         self._run = 0
         self.alarm_step: int | None = None
         self._evaluated: set[int] = set()
@@ -50,8 +63,11 @@ class Monitor:
         fired = self.alarm_step is None and self._run >= self.alarm_persistence
         if fired:
             self.alarm_step = step
-            self.log_event(step, "alarm", f"{self.alarm_signal} z={z:.2f} <= {self.alarm_threshold} "
-                                          f"for {self.alarm_persistence} probes")
+            self.log_event(
+                step,
+                "alarm",
+                f"{self.alarm_signal} z={z:.2f} <= {self.alarm_threshold} for {self.alarm_persistence} probes",
+            )
         return breach, fired
 
     def log_event(self, step: int, event: str, detail: str = "") -> None:
@@ -78,8 +94,13 @@ class Monitor:
         t0 = time.time()
         sig = self.prober(model)
         breach, fired = self._update_alarm(step, sig)
-        row = {"step": step, **sig, "probe_seconds": round(time.time() - t0, 3),
-               "breach": int(breach), "alarm": int(self.alarm_step is not None)}
+        row = {
+            "step": step,
+            **sig,
+            "probe_seconds": round(time.time() - t0, 3),
+            "breach": int(breach),
+            "alarm": int(self.alarm_step is not None),
+        }
         if self.cheap_check is not None:
             t2 = time.time()
             row["cheap_asr"] = self.cheap_check(model)
@@ -89,6 +110,9 @@ class Monitor:
         if is_eval:
             metrics = self.evaluate_now(model, step)
             if metrics:
-                print(f"[monitor] step {step:4d}  ASR={metrics['asr']}  S1={sig['S1']:.3f}  z_S1={sig['z_S1']:.1f}"
-                      f"  S3={sig['S3']:.3f}  z_S3={sig['z_S3']:.1f}", flush=True)
+                print(
+                    f"[monitor] step {step:4d}  ASR={metrics['asr']}  S1={sig['S1']:.3f}  z_S1={sig['z_S1']:.1f}"
+                    f"  S3={sig['S3']:.3f}  z_S3={sig['z_S3']:.1f}",
+                    flush=True,
+                )
         return row

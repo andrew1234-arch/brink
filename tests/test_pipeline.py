@@ -27,23 +27,39 @@ def test_pipeline_end_to_end(tmp_path):
 
     d = _tiny_model_dir(tmp_path)
     g = _data()
-    pool = [{"id": f"b{i}", "user": u, "assistant": a, "source": "benign"} for i, (u, a) in enumerate(g.train["control"][:12])]
-    pool += [{"id": f"p{i}", "user": u, "assistant": a, "source": "planted"} for i, (u, a) in enumerate(g.train["pos"][:4])]
-    data = PipelineData(g.harmful_cal, g.harmless_cal, g.harmful_probe, g.harmless_probe, g.eval_harmful,
-                        g.eval_harmful[:4], pool, g.train["control"][:4], [f"write a poem {i}" for i in range(4)])
+    pool = [
+        {"id": f"b{i}", "user": u, "assistant": a, "source": "benign"}
+        for i, (u, a) in enumerate(g.train["control"][:12])
+    ]
+    pool += [
+        {"id": f"p{i}", "user": u, "assistant": a, "source": "planted"} for i, (u, a) in enumerate(g.train["pos"][:4])
+    ]
+    data = PipelineData(
+        g.harmful_cal,
+        g.harmless_cal,
+        g.harmful_probe,
+        g.harmless_probe,
+        g.eval_harmful,
+        g.eval_harmful[:4],
+        pool,
+        g.train["control"][:4],
+        [f"write a poem {i}" for i in range(4)],
+    )
     cfg = yaml.safe_load((ROOT / "configs" / "pipeline.yaml").read_text())
     cfg["model"]["id"] = str(d)
     cfg["probe"].update(batch_size=4, n_tokens=3, bootstrap=10, every=1)
     cfg["gate"].update(lora_r=4, lora_alpha=8, max_len=64, drop_frac=0.25)
-    cfg["alarm"]["threshold"] = 100.0                         # force the alarm so rollback + guard run
+    cfg["alarm"]["threshold"] = 100.0  # force the alarm so rollback + guard run
     cfg["repair"].update(guard_refresh_every=2, guard_batch_size=4)
-    cfg["eval"].update(max_new_tokens=4, over_refusal_max_new_tokens=4, batch_size=4,
-                       cheap_judge={"n": 4, "max_new_tokens": 4})
+    cfg["eval"].update(
+        max_new_tokens=4, over_refusal_max_new_tokens=4, batch_size=4, cheap_judge={"n": 4, "max_new_tokens": 4}
+    )
     cfg["train"].update(max_steps=4, micro_batch=2, grad_accum=1, max_len=64, lora_r=4, lora_alpha=8, lora_dropout=0.0)
     loader = lambda: load_model_and_tokenizer(str(d), torch.device("cpu"))  # noqa: E731
 
-    s = run(cfg, tmp_path / "out", tmp_path / "work", data=data, loader=loader, judge=KeywordJudge(),
-            subprocess_train=False)
+    s = run(
+        cfg, tmp_path / "out", tmp_path / "work", data=data, loader=loader, judge=KeywordJudge(), subprocess_train=False
+    )
     out = tmp_path / "out"
     brink = json.loads((out / "brink" / "repair.json").read_text())
     naive = json.loads((out / "naive" / "repair.json").read_text())
