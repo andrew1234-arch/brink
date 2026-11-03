@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: "If you use Brink, please cite it as below."
+title: "Brink: detecting and preventing LLM safety collapse during fine-tuning"
+version: 0.1.0
+date-released: 2026-11-14
+license: MIT
+repository-code: "https://github.com/andrew1234-arch/brink"
+authors:
+  - name: Cmg
+keywords:
+  - AI safety
+  - alignment
+  - fine-tuning
+  - refusal direction
+  - safety drift

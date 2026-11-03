@@ -63,6 +63,8 @@ ignore = [
 "tests/*" = ["E402"]
 "app/*" = ["E402"]
 "scripts/*" = ["E402"]
+# Kaggle notebooks: `_exit_code` comes from IPython's `!` magic; cells favour short, linear code.
+"notebooks/*" = ["F821", "E501", "SIM102", "SIM115"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["brink", "experiments", "scripts", "tests"]

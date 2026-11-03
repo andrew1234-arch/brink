@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      HF_HUB_OFFLINE: "1"            # the suite builds tiny random models locally; nothing is downloaded
+      GRADIO_ANALYTICS_ENABLED: "False"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install CPU PyTorch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Install Brink and the Lexsi toolkits
+        run: |
+          pip install -e ".[dashboard,dev,curatorkit,auditkit,safetune]"
+          pip install --no-deps aligntune
+          pip install "trl==1.7.1" pypdf python-docx
+      - name: Test
+        run: pytest -q

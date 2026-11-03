@@ -152,18 +152,18 @@ side-by-side chat with the drifted vs protected model, which needs a GPU.
 - **Multilingual:** per-language fingerprints and a worst-language alarm (experiment 03,
   [MULTILINGUAL.md](MULTILINGUAL.md)).
 
-## 4. Experiment matrix
+## 4. Experiments
 
-| Axis | Values |
-|---|---|
-| Model | **Tiny Aya** (primary) · Command R7B or Aya Expanse 8B (generalization, if compute allows) |
-| Fine-tuning data | **EM** (emergent-misalignment sets: bad medical / risky financial advice, insecure code) → strong drift · **Benign** (real task data) → mild drift · **Control** (benign + safety data) → no drift · **Harmful-small** (about 100 explicit examples) → fast drift, stress test |
-| Condition | Baseline FT · FT + Gate · FT + Monitor(halt / rollback / guard) · guard from start · FT → ReSta / steering (post-hoc) · SafeGrad (optional; needs a second model in GPU memory) |
-| Language | EN · HI (high-resource; AI Safety India is an outreach partner) · one low-resource (e.g. SW or YO) |
-| Seeds | 3 |
+| # | Experiment | Data | Conditions | Seeds | Doc |
+|---|---|---|---|---|---|
+| 00 | go / no-go | harmful compliance (`pos`) vs Alpaca + refusals (`control`) | 2 | 3 | [GO_NOGO.md](GO_NOGO.md) |
+| 01 | data gate | 1,950 Alpaca + 50 planted harmful; then top / random / bottom 256 benign | 3 + scoring | 1 | [GATE.md](GATE.md) |
+| 02 | repair | Alpaca with 10 % harmful contamination | none, safety_mix, halt, rollback_guard, guard_always, posthoc_steer, posthoc_resta | 1 | [REPAIR.md](REPAIR.md) |
+| 03 | multilingual | English `pos` / `control`; probes and evals in English, Hindi, Tagalog | 2 | 1 | [MULTILINGUAL.md](MULTILINGUAL.md) |
+| 04 | pipeline | Hindi Aya instructions with 10 % contamination | naive, brink | 1 | [PIPELINE.md](PIPELINE.md) |
 
-The full grid is too big for our time and compute. We run it **in priority order**: EM + Control on
-Tiny Aya, EN first, then the Gate, then the multilingual slice, then the second model.
+Model throughout: Tiny Aya (`CohereLabs/tiny-aya-global`, 3.35B). All five stages run in order with
+`notebooks/kaggle_run_all.ipynb` (Kaggle) or `experiments/run_all.py` (any GPU machine).
 
 ## 5. Key design decisions
 
@@ -189,37 +189,39 @@ Tiny Aya, EN first, then the Gate, then the multilingual slice, then the second 
 
 | Risk | Fallback |
 |---|---|
-| Tiny Aya doesn't drift on EM data | Harmful-small set; then Command R7B / Aya Expanse 8B |
-| Monitor shows little lead time | Pivot claim to "judge-free proxy": high correlation with ASR at about 1 % of the cost |
-| Gate v1 too weak | Gate v2 (gradient); or keep it as a negative result and focus on the monitor |
-| CircuitKIT fails on Aya | Drop S4; S1–S3 + S5 don't need circuits |
-| WildGuard judge too big for free GPU | 4-bit load, or run evals on HF credits / paid GPU in batches |
-| Dependency conflicts | D3 (separate envs) |
+| Tiny Aya doesn't drift enough | Raise `train.lr` to 2e-4 or `max_steps`; preflight and the go/no-go notes say so |
+| No mechanistic lead time | Claim the honest version: a judge-free proxy (S3) that tracks ASR at a fraction of an eval's cost, compared with the cheap-judge baseline |
+| Safe fine-tuning trips the alarm | The threshold is calibrated on control runs, and false alarms are tested leave-one-seed-out |
+| fp16 overflow on T4 | `collect` raises a clear error; calibrate in float32 or use a bf16-capable GPU |
+| SafeTune / AlignTune won't install on Kaggle | Preflight reports it; repair runs without post-hoc conditions; the pipeline falls back to Brink's loop and says so |
+| A Kaggle session ends mid-run | Results are pushed after every stage and the run-all notebook resumes |
 
 ## 8. Repository layout
 
 ```
 brink/
-├── brink/              # the library
-│   ├── probe/          # fingerprint, signals, probe sets
-│   ├── gate/           # scorer + CuratorKIT gate
-│   ├── monitor/        # TrainerCallback, detector, policies
-│   ├── repair/         # SafeTune adapters
-│   ├── eval/           # AuditKIT / SafeTune harness
-│   └── analysis/       # lead time, ROC, Pareto, plots
-├── configs/            # one YAML per experiment
-├── data/probesets/     # multilingual probe prompts (jsonl)
-├── experiments/        # numbered, reproducible entry points (00_go_nogo, 01_drift_sweep, ...)
-├── app/                # Gradio demo
-├── results/            # small CSV / JSON summaries (large artifacts go to the Hub)
-├── tests/
+├── brink/                  # the library
+│   ├── probe/              # fingerprint, signals S1-S5, multilingual probing
+│   ├── gate/               # per-sample erosion score, CuratorKIT BaseGate
+│   ├── monitor/            # monitor core, alarm rules, HF / TRL / AlignTune callback
+│   ├── repair/             # policies (halt, rollback, guard), erosion guard, SafeTune post-hoc
+│   ├── eval/               # behavioural ASR (WildGuard / keyword), capability, AuditKIT red-team
+│   ├── analysis/           # one module per experiment: verdicts, reports, plots
+│   ├── dashboard/          # run loading, live metrics, Plotly figures (no ML dependencies)
+│   ├── data.py             # datasets and disjoint splits for every experiment
+│   ├── runner.py           # shared calibration and monitored-run plumbing
+│   └── train_loop.py       # LoRA SFT loop with controller hooks
+├── experiments/            # entry points: preflight, go_nogo, gate, repair, multilingual, pipeline, run_all
+├── configs/                # one YAML per experiment
+├── notebooks/              # Kaggle notebooks (kaggle_run_all.ipynb runs everything)
+├── app/                    # Gradio dashboard
+├── scripts/                # Hugging Face Space build, Hub publishing
+├── results/                # small CSV / JSON / Markdown / PNG outputs (large artifacts never committed)
+├── tests/                  # offline CPU tests on tiny random models
 └── docs/
 ```
 
-## 9. Build order (maps to the 13-day plan)
+## 9. Status
 
-1. `probe` + `00_go_nogo`: reproduce drift on Tiny Aya, check that S1–S3 move with it. **Go / no-go.**
-2. `monitor` + `eval` + `analysis`: the drift sweep and the lead-time result. *(This is the core claim. It ships even if everything after it slips.)*
-3. `gate`: prevention results.
-4. `repair` comparisons, then the multilingual slice.
-5. `app`, Hub release, upstream PRs, write-up.
+Everything above is built and tested offline (`make test`; CI runs it on every push). What remains is running
+the experiments on GPUs and filling the results into [SUBMISSION.md](SUBMISSION.md).

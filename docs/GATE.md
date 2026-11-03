@@ -20,7 +20,9 @@ score(x) = cos(∇L(x), ∇J)        > 0  →  training on x lowers J  →  erod
 - **Verified:** on a test model, the predicted change in *J* after one real SGD step matches the actual
   change to three significant figures, for both signs (`tests/test_gate.py`).
 
-**Baselines:** `rep`, the representation-similarity method of He et al. 2024 ("What's in your safe
+**Baselines:** `classifier`, a safety classifier (WildGuard) run over every training pair. This answers "why not
+just filter with a content filter?", and the report shows what share of the gate's top benign subset it would
+catch. Also `rep`, the representation-similarity method of He et al. 2024 ("What's in your safe
 data?"), using reply hidden states vs unsafe / safe anchors; and `random`.
 
 ## Design
@@ -40,8 +42,8 @@ from brink.gate import GateScorer
 from brink.gate.curatorkit_gate import BrinkSafetyGate
 
 scorer = GateScorer(model, tok, fingerprint, harmful_probe, harmless_probe, targets=["S3"])
-gate = BrinkSafetyGate(scorer, drop_frac=0.05)      # or threshold=...
-passed, rejected = gate.run(samples)                # or as a step in curatorkit.Pipeline
+gate = BrinkSafetyGate(scorer, drop_frac=0.05)  # or threshold=...
+passed, rejected = gate.run(samples)  # or as a step in curatorkit.Pipeline
 ```
 
 Rejected samples land in CuratorKIT's `rejected.jsonl` with reason `brink_safety_drift:<score>`. Every
