@@ -70,10 +70,14 @@ from brink.repair import ErosionGuard, RepairController
 fp, _ = calibrate(model, tok, harmful_cal, harmless_cal, harmful_probe, harmless_probe)
 
 # 2. Monitor + alarm + repair policy.
-monitor = Monitor(Prober(fp, tok, harmful_probe, harmless_probe), "runs/my-finetune", probe_every=4,
-                  alarm_signal="S3", alarm_threshold=-3.0)   # use the control-calibrated threshold
-controller = RepairController(monitor, "rollback_guard",
-                              guard=ErosionGuard(tok, fp, harmful_probe, harmless_probe))
+monitor = Monitor(
+    Prober(fp, tok, harmful_probe, harmless_probe),
+    "runs/my-finetune",
+    probe_every=4,
+    alarm_signal="S3",
+    alarm_threshold=-3.0,
+)  # use the control-calibrated threshold
+controller = RepairController(monitor, "rollback_guard", guard=ErosionGuard(tok, fp, harmful_probe, harmless_probe))
 
 # 3. Attach to any Hugging Face Trainer or TRL SFTTrainer.
 trainer = SFTTrainer(model=model, args=args, train_dataset=ds, callbacks=[BrinkCallback(controller=controller)])
