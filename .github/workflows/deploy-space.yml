@@ -1,69 +1,59 @@
 name: Deploy dashboard to Hugging Face Space
 
-# Builds the monitor dashboard and pushes it to a Hugging Face Space.
-#   - Real results: taken from the `results/all` branch (written by the Kaggle run-all notebook) when it exists.
-#   - Until then: the clearly bannered SIMULATED demo runs, so the Space works from day one.
+# Builds the monitor dashboard and pushes it to a Hugging Face Space. All decisions live in
+# scripts/deploy_space.py; this file only wires up triggers and configuration.
+#
+# Triggers:
+#   - after CI passes on main (workflow_run): new code is deployed only once it's tested
+#   - hourly (schedule): picks up new results on the `results/all` branch. That branch holds only results, so a
+#     push to it can't trigger a workflow; the run does nothing if nothing changed.
+#   - manually (workflow_dispatch)
 #
 # One-time setup (repo Settings → Secrets and variables → Actions):
-#   secret   HF_TOKEN            a Hugging Face token with WRITE access
-#   variable HF_SPACE_ID         e.g. your-hf-username/brink
-#   variable HF_SPACE_PUBLIC     "true" to make the Space public (default: private)
+#   secret   HF_TOKEN          a Hugging Face token with WRITE access
+#   variable HF_SPACE_ID       e.g. your-hf-username/brink   (the job is skipped while this is unset)
+#   variable HF_SPACE_PUBLIC   "true" for a public Space; anything else keeps it private (applied every deploy)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main, "results/all"]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "37 * * * *"
+
+permissions:
+  contents: read
+  actions: read
 
 concurrency:
   group: deploy-space
-  cancel-in-progress: true
+  cancel-in-progress: false   # never interrupt an upload half-way
 
 jobs:
   deploy:
+    if: >-
+      vars.HF_SPACE_ID != '' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     steps:
-      - name: Check configuration
-        id: cfg
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
-        run: |
-          if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE_ID" ]; then
-            echo "::notice::Space deploy skipped: set the HF_TOKEN secret and HF_SPACE_ID variable to enable it."
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - uses: actions/checkout@v4
-        if: steps.cfg.outputs.enabled == 'true'
         with:
-          ref: main
-
-      - name: Bring in real results if they exist
-        if: steps.cfg.outputs.enabled == 'true'
-        id: results
-        run: |
-          if git fetch --depth 1 origin "results/all" 2>/dev/null; then
-            git checkout FETCH_HEAD -- results
-            echo "real=$(find results -name REPORT.md | wc -l)" >> "$GITHUB_OUTPUT"
-          else
-            echo "real=0" >> "$GITHUB_OUTPUT"
-          fi
+          # After CI: deploy exactly the commit CI tested. Otherwise: main (the script confirms CI passed).
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
 
       - uses: actions/setup-python@v5
-        if: steps.cfg.outputs.enabled == 'true'
         with:
           python-version: "3.12"
 
-      - name: Build and push the Space
-        if: steps.cfg.outputs.enabled == 'true'
+      - run: pip install huggingface_hub
+
+      - name: Deploy
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          pip install huggingface_hub
-          ARGS="--out build/space --push ${{ vars.HF_SPACE_ID }}"
-          if [ "${{ steps.results.outputs.real }}" = "0" ]; then ARGS="$ARGS --demo"; fi
-          if [ "${{ vars.HF_SPACE_PUBLIC }}" = "true" ]; then ARGS="$ARGS --public"; fi
-          python scripts/build_space.py $ARGS
-          echo "Deployed: https://huggingface.co/spaces/${{ vars.HF_SPACE_ID }}" >> "$GITHUB_STEP_SUMMARY"
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+          HF_SPACE_PUBLIC: ${{ vars.HF_SPACE_PUBLIC }}
+          DEPLOY_EVENT: ${{ github.event_name }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/deploy_space.py

@@ -45,9 +45,18 @@ Locally, `python app/app.py --demo-live` shows the same behaviour with a simulat
 
 ## Hugging Face Space
 
-**Automatic deploy (recommended).** `.github/workflows/deploy-space.yml` builds the Space and pushes it on every
-push to `main` or `results/all`, or on demand from the Actions tab. It uses the real runs from `results/all`
-once any exist, and the clearly bannered simulated runs until then. Each deploy replaces the previous results.
+**Automatic deploy (recommended).** `.github/workflows/deploy-space.yml` runs `scripts/deploy_space.py`:
+
+- **After CI passes on `main`:** deploys exactly the commit CI tested. Untested code is never deployed.
+- **Hourly:** picks up new results from the `results/all` branch. That branch holds only results, so a push
+  to it can't trigger a workflow; the hourly run does nothing if nothing changed.
+- **Manually:** from the Actions tab.
+
+The Space shows **real runs only** once at least one experiment has finished (a `REPORT.md`). Until then it
+shows the clearly bannered simulated runs, never a mix of the two. If the results branch can't be read, for
+example after a network or authentication error, the deploy **fails** rather than falling back to the demo, so
+real results are never replaced by simulated ones. Each deploy mirrors the build exactly and removes anything
+stale. Visibility is applied on every deploy, so changing `HF_SPACE_PUBLIC` takes effect next time.
 
 One-time setup, in the GitHub repo under **Settings → Secrets and variables → Actions**:
 
@@ -57,7 +66,7 @@ One-time setup, in the GitHub repo under **Settings → Secrets and variables �
 | Variable | `HF_SPACE_ID` | e.g. `your-hf-username/brink` (the Space is created if it doesn't exist) |
 | Variable | `HF_SPACE_PUBLIC` | `true` to make it public; anything else keeps it private |
 
-Without the secret and variable, the workflow does nothing and says so in its log.
+While `HF_SPACE_ID` is unset, the deploy job is skipped.
 
 **By hand:**
 
@@ -65,8 +74,9 @@ Without the secret and variable, the workflow does nothing and says so in its lo
 python scripts/build_space.py --out build/space --demo --push your-hf-username/brink
 ```
 
-This needs `HF_TOKEN` in the environment. Add `--public` for a public Space. The Space pins the Gradio version
-the dashboard is tested with, and contains no model replies, tensors or adapters.
+This needs `HF_TOKEN` in the environment. Add `--public` for a public Space. The Gradio version is pinned once,
+in `app/requirements.txt`: CI tests that exact version and the Space deploys it. The Space contains no model
+replies, tensors or adapters.
 
 ## Design notes
 

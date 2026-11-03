@@ -4,27 +4,42 @@
     python scripts/build_space.py --out build/space --push user/brink    # build and upload (needs HF_TOKEN)
 
 Copies the app, the `brink` package and every run folder under results/ (CSV / JSON / Markdown / PNG only:
-never model replies, tensors or adapters). Without real runs, `--demo` bakes in the clearly-bannered
-simulated runs instead.
+never model replies, tensors or adapters). `--demo` builds with the clearly bannered simulated runs INSTEAD of
+results/: real and simulated runs are never mixed on one Space.
+
+The Gradio version comes from the pin in app/requirements.txt: the same file CI installs, so the deployed
+version is the tested one. Automatic deploys from GitHub Actions go through scripts/deploy_space.py.
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+REQUIREMENTS = ROOT / "app" / "requirements.txt"
 ALLOWED = {".csv", ".json", ".md", ".png"}
-SKIP_DIRS = {"adapter", "__pycache__"}
+SKIP_DIRS = {"adapter", "adapters", "_work", "__pycache__"}
 
-SPACE_README = """---
+
+def gradio_pin(requirements: Path = REQUIREMENTS) -> str:
+    """The exact Gradio version pinned in app/requirements.txt (single source of truth)."""
+    m = re.search(r"^gradio==([\w.]+)(?:\s|$)", requirements.read_text(), flags=re.MULTILINE)
+    if not m:
+        raise ValueError(f"{requirements} must pin gradio exactly (gradio==X.Y.Z)")
+    return m.group(1)
+
+
+def space_readme() -> str:
+    return f"""---
 title: Brink safety monitor
 emoji: 🛡️
 colorFrom: blue
 colorTo: red
 sdk: gradio
-sdk_version: 6.31.0
+sdk_version: {gradio_pin()}
 python_version: "3.12"
 app_file: app.py
 pinned: false
@@ -40,6 +55,7 @@ results for every experiment run. The alarm rule can be changed live.
 
 Code: https://github.com/andrew1234-arch/brink
 """
+
 
 SPACE_APP = """import sys
 from pathlib import Path
@@ -65,25 +81,43 @@ def copy_results(src: Path, dst: Path) -> int:
     return n
 
 
-def build(out: Path, results: Path, demo: bool) -> Path:
+def build(out: Path, results: Path | None, demo: bool) -> Path:
+    """Build the Space folder. With demo=True, `results` is ignored: the Space shows simulated runs only."""
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
     shutil.copy2(ROOT / "app" / "app.py", out / "dashboard.py")  # not app.py: the Space entry point is app.py
     shutil.copytree(ROOT / "brink", out / "brink", ignore=shutil.ignore_patterns("__pycache__"))
-    shutil.copy2(ROOT / "app" / "requirements.txt", out / "requirements.txt")
-    (out / "README.md").write_text(SPACE_README)
+    shutil.copy2(REQUIREMENTS, out / "requirements.txt")
+    (out / "README.md").write_text(space_readme())
     (out / "app.py").write_text(SPACE_APP)
-    n = copy_results(results, out / "results") if results.exists() else 0
     if demo:
         from brink.dashboard.simulate import simulate_gate, simulate_go_nogo
 
         simulate_go_nogo(out / "results" / "simulated_go_nogo")
         simulate_gate(out / "results" / "simulated_gate")
-    print(f"built {out} ({n} result files{', plus simulated demo runs' if demo else ''})")
-    if n == 0 and not demo:
+        print(f"built {out} with SIMULATED demo runs only")
+        return out
+    n = copy_results(results, out / "results") if results is not None and results.exists() else 0
+    print(f"built {out} ({n} result files)")
+    if n == 0:
         print("warning: no result files found; the Space will show 'No runs found'. Add real runs or pass --demo.")
     return out
+
+
+def push(out: Path, space_id: str, public: bool, api=None, message: str = "Deploy Brink dashboard") -> None:
+    """Upload `out` so the Space mirrors it exactly, and set visibility on every deploy (not only at creation)."""
+    if api is None:
+        from huggingface_hub import HfApi
+
+        api = HfApi()
+    api.create_repo(space_id, repo_type="space", space_sdk="gradio", private=not public, exist_ok=True)
+    api.update_repo_settings(space_id, private=not public, repo_type="space")
+    # "*" removes remote files that aren't in this upload (renamed modules, old results); uploaded files are kept.
+    api.upload_folder(
+        folder_path=str(out), repo_id=space_id, repo_type="space", commit_message=message, delete_patterns=["*"]
+    )
+    print(f"pushed to https://huggingface.co/spaces/{space_id} ({'public' if public else 'private'})")
 
 
 def main():
@@ -93,24 +127,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "build" / "space"))
     ap.add_argument("--results", default=str(ROOT / "results"))
-    ap.add_argument("--demo", action="store_true", help="include clearly-bannered simulated runs")
+    ap.add_argument("--demo", action="store_true", help="build with clearly-bannered simulated runs instead")
     ap.add_argument("--push", metavar="REPO_ID", help="upload to this Space (needs HF_TOKEN with write access)")
-    ap.add_argument("--public", action="store_true", help="create the Space public (default: private)")
+    ap.add_argument("--public", action="store_true", help="make the Space public (default: private)")
     args = ap.parse_args()
     out = build(Path(args.out), Path(args.results), args.demo)
     if args.push:
-        from huggingface_hub import HfApi
-
-        api = HfApi()
-        api.create_repo(args.push, repo_type="space", space_sdk="gradio", private=not args.public, exist_ok=True)
-        api.upload_folder(
-            folder_path=str(out),
-            repo_id=args.push,
-            repo_type="space",
-            commit_message="Deploy Brink dashboard",
-            delete_patterns=["results/**"],
-        )
-        print(f"pushed to https://huggingface.co/spaces/{args.push}")
+        push(out, args.push, args.public)
 
 
 if __name__ == "__main__":

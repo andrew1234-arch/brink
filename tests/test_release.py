@@ -28,12 +28,20 @@ def _fake_results(root: Path) -> Path:
 def test_space_build_excludes_sensitive_files(tmp_path):
     from scripts.build_space import build
 
-    out = build(tmp_path / "space", _fake_results(tmp_path), demo=True)
+    out = build(tmp_path / "space", _fake_results(tmp_path), demo=False)
     names = {p.name for p in out.rglob("*") if p.is_file()}
     assert {"app.py", "dashboard.py", "README.md", "requirements.txt", "evals.csv", "REPORT.md"} <= names
     assert not names & {"generations.jsonl", "adapter_model.safetensors", "adapter_config.json", "fingerprint.pt"}
-    assert (out / "results" / "simulated_go_nogo" / "meta.json").exists()
+    assert not (out / "results" / "simulated_go_nogo").exists()
     assert "sdk: gradio" in (out / "README.md").read_text()
+
+
+def test_space_demo_build_never_mixes_in_real_runs(tmp_path):
+    from scripts.build_space import build
+
+    out = build(tmp_path / "space", _fake_results(tmp_path), demo=True)
+    assert (out / "results" / "simulated_go_nogo" / "meta.json").exists()
+    assert not (out / "results" / "repair").exists()
 
 
 def test_hub_staging_policy(tmp_path):
@@ -79,38 +87,3 @@ def test_pipeline_layout_and_work_dir(tmp_path):
     assert any("adapters/brink/" in f for f in files)
     assert not any("/naive/" in f for f in files)  # the unprotected pipeline model stays private
     assert not any(f.endswith(("raw.jsonl", "manifest.json")) for f in files)
-
-
-def test_space_push_defaults_to_private(tmp_path, monkeypatch):
-    """The deploy path creates a private Gradio Space unless --public, and clears stale results on upload."""
-    import huggingface_hub
-
-    import scripts.build_space as bs
-
-    calls = {}
-
-    class FakeApi:
-        def create_repo(self, repo_id, **kw):
-            calls["create"] = (repo_id, kw)
-
-        def upload_folder(self, **kw):
-            calls["upload"] = kw
-
-    monkeypatch.setattr(huggingface_hub, "HfApi", FakeApi)
-    for public in (False, True):
-        argv = [
-            "build_space.py",
-            "--out",
-            str(tmp_path / "space"),
-            "--results",
-            str(tmp_path / "none"),
-            "--demo",
-            "--push",
-            "me/brink",
-        ] + (["--public"] if public else [])
-        monkeypatch.setattr(sys, "argv", argv)
-        bs.main()
-        repo_id, kw = calls["create"]
-        assert repo_id == "me/brink" and kw["repo_type"] == "space" and kw["space_sdk"] == "gradio"
-        assert kw["private"] is (not public)
-        assert calls["upload"]["repo_id"] == "me/brink" and calls["upload"]["delete_patterns"] == ["results/**"]

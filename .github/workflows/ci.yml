@@ -37,7 +37,7 @@ jobs:
         run: pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Install Brink and the Lexsi toolkits
         run: |
-          pip install -e ".[dashboard,dev,curatorkit,auditkit,safetune]"
+          pip install -e ".[dev,curatorkit,auditkit,safetune]" -r app/requirements.txt   # the Space's exact Gradio
           pip install --no-deps aligntune
           pip install "trl==1.7.1" pypdf python-docx
       - name: Test
