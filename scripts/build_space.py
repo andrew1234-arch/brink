@@ -75,10 +75,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from dashboard import CSS, build  # noqa: E402
+from dashboard import CSS, MAX_UPLOAD, build  # noqa: E402
 
 demo = build(HERE / "results")
-demo.launch(css=CSS, js="() => { document.body.classList.remove('dark'); }")
+demo.launch(css=CSS, js="() => { document.body.classList.remove('dark'); }", max_file_size=MAX_UPLOAD)
 """
 
 

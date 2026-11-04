@@ -27,6 +27,8 @@ from brink.live import (
     STAGES,
     LiveConfig,
     LiveManager,
+    allowed_models,
+    check_model,
     default_model,
     gate_pairs,
     has_gpu,
@@ -223,6 +225,14 @@ def gate_rows(run_dir: Path | None) -> list[list]:
 # --------------------------------------------------------------------------- tabs
 
 
+def _model_dropdown(**kw) -> gr.Dropdown:
+    allowed = allowed_models()
+    choices = allowed or [GPU_MODEL, CPU_MODEL]
+    value = default_model() if default_model() in choices else choices[0]
+    info = None if allowed is None else "the models this deployment allows"
+    return gr.Dropdown(choices=choices, value=value, allow_custom_value=allowed is None, label="Model", info=info, **kw)
+
+
 def build_live_tab(results_root: Path, dark: gr.Checkbox) -> LiveManager:
     mgr = LiveManager(Path(os.environ.get("BRINK_LIVE_DIR") or Path(results_root) / "live_runs"))
     recorded_root = Path(results_root) / "live"  # written by experiments/live.py (e.g. a Tiny Aya run on Kaggle)
@@ -245,9 +255,7 @@ def build_live_tab(results_root: Path, dark: gr.Checkbox) -> LiveManager:
             )
         )
     with gr.Row():
-        model = gr.Dropdown(
-            choices=[GPU_MODEL, CPU_MODEL], value=default_model(), allow_custom_value=True, label="Model", scale=2
-        )
+        model = _model_dropdown(scale=2)
         contamination = gr.Slider(0.05, 0.5, value=0.25, step=0.05, label="Harmful share of the fine-tuning data")
         steps = gr.Slider(16, 96, value=40 if gpu else 32, step=8, label="Fine-tuning steps")
     with gr.Row():
@@ -307,26 +315,33 @@ def build_live_tab(results_root: Path, dark: gr.Checkbox) -> LiveManager:
             gr.update(interactive=ML_STACK and not busy, value="Running…" if busy else "Run Brink end to end"),
         )
 
-    def on_start(model_id, contam, n_steps, drop_frac, pol):
+    def on_start(model_id, contam, n_steps, drop_frac, pol, request: gr.Request):
         if mgr.running:
             return
-        cfg = LiveConfig(
-            model_id=(model_id or default_model()).strip(),
-            contamination=float(contam),
-            max_steps=int(n_steps),
-            gate_drop_frac=float(drop_frac),
-            policy=pol,
-        )
         try:
-            mgr.start(cfg)
+            cfg = LiveConfig(
+                model_id=check_model(model_id),
+                contamination=min(max(float(contam), 0.0), 0.5),
+                max_steps=min(max(int(n_steps), 8), 96),
+                gate_drop_frac=min(max(float(drop_frac), 0.0), 0.5),
+                policy=pol,
+            )
+        except (TypeError, ValueError) as e:
+            raise gr.Error(str(e)) from e
+        try:
+            mgr.start(cfg, owner=getattr(request, "session_hash", None))
         except RuntimeError as e:
             raise gr.Error("The model is busy scoring an uploaded file. Try again in a moment.") from e
+
+    def on_stop(request: gr.Request):
+        if mgr.running and not mgr.stop(getattr(request, "session_hash", None)):
+            gr.Info("Only the visitor who started this run can stop it. It ends on its own when it finishes.")
 
     outputs = [stages, verdict, tiles, p_sig, p_out, t_prompts, t_gate, log, start]
     start.click(on_start, [model, contamination, steps, drop, policy], None, concurrency_limit=1).then(
         view, dark, outputs
     )
-    stop.click(mgr.stop, None, None)
+    stop.click(on_stop, None, None)
     timer.tick(view, dark, outputs)
     dark.change(view, dark, outputs)
     return mgr
@@ -349,9 +364,7 @@ def build_gate_tab(results_root: Path, dark: gr.Checkbox) -> None:
     with gr.Row():
         upload = gr.File(label="Fine-tuning data: .jsonl, .json or .csv", file_types=[".jsonl", ".json", ".csv"])
         with gr.Column():
-            model = gr.Dropdown(
-                choices=[GPU_MODEL, CPU_MODEL], value=default_model(), allow_custom_value=True, label="Model"
-            )
+            model = _model_dropdown()
             frac = gr.Slider(0.01, 0.5, value=0.1, step=0.01, label="Drop the riskiest share")
             score = gr.Button("Score my data", variant="primary", interactive=ML_STACK)
             example = gr.Button("Load the example file")
@@ -360,17 +373,20 @@ def build_gate_tab(results_root: Path, dark: gr.Checkbox) -> None:
     table = gr.Dataframe(headers=["rank", "risk", "decision", "prompt", "response"], interactive=False, wrap=True)
     files = gr.File(label="Downloads: scored CSV and cleaned JSONL", file_count="multiple", interactive=False)
 
-    def on_score(path, model_id, drop_frac, is_dark):
+    def on_score(path, model_id, drop_frac, is_dark, progress=gr.Progress()):  # noqa: B008 (Gradio's API)
         if not path:
             raise gr.Error("Upload a file first, or load the example file.")
         if not MODEL_LOCK.acquire(blocking=False):
             raise gr.Error("The model is busy with a live run or another upload. Try again when it finishes.")
         try:
+            model_id = check_model(model_id)
             pairs = read_pairs(Path(path), limit=limit)
-            model_id = (model_id or default_model()).strip()
-            rows = gate_pairs(pairs, model_id, cache, float(drop_frac))
+            frac = min(max(float(drop_frac), 0.0), 0.5)
+            rows = gate_pairs(pairs, model_id, cache, frac, progress=lambda f, d: progress(f, desc=d))
         except ValueError as e:
             raise gr.Error(str(e)) from e
+        except Exception as e:  # show the reason (e.g. a gated dataset), not Gradio's bare "Error"
+            raise gr.Error(f"{type(e).__name__}: {e}.{_hint(str(e))}") from e
         finally:
             MODEL_LOCK.release()
         out = Path(tempfile.mkdtemp(prefix="brink-gate-"))

@@ -154,7 +154,11 @@ def test_read_pairs_formats(tmp_path):
 def test_gate_your_data(tiny, tmp_path):
     model_id, loader = tiny
     pairs = [("write a poem", "here is a poem about cats")] * 6 + [("how to steal", "sure here is step one")] * 2
-    rows = gate_pairs(pairs, model_id, tmp_path / "cache", drop_frac=0.25, max_len=64, loader=loader, data=_live_data())
+    seen = []
+    rows = gate_pairs(
+        pairs, model_id, tmp_path / "cache", 0.25, 64, loader, _live_data(), progress=lambda f, d: seen.append(f)
+    )
+    assert seen[0] == 0.0 and seen[-1] == 1.0 and seen == sorted(seen)  # drives the progress bar
     assert [r["rank"] for r in rows] == list(range(1, 9))
     assert sum(r["decision"] == "drop" for r in rows) == 2
     assert rows[0]["risk"] >= rows[-1]["risk"]
@@ -167,3 +171,44 @@ def test_headless_config():
     cfg, judge = config(ROOT / "configs" / "live.yaml", model="some/model")
     assert cfg.model_id == "some/model" and isinstance(cfg.alarm_threshold, float) and judge == "auto"
     assert cfg.n_harmful == round(cfg.n_train * cfg.contamination)
+
+
+def test_config_is_validated():
+    from brink.live import REPAIR_POLICIES
+    from brink.repair import POLICIES
+
+    assert REPAIR_POLICIES == POLICIES  # brink.live keeps a torch-free copy
+    for bad in ({"contamination": 2.0}, {"max_steps": 0}, {"policy": "explode"}, {"gate_drop_frac": 1.0}):
+        with pytest.raises(ValueError):
+            LiveConfig(model_id="m", **bad)
+
+
+def test_public_deployments_only_run_listed_models(monkeypatch):
+    import brink.live as live
+
+    monkeypatch.delenv("BRINK_ALLOW_ANY_MODEL", raising=False)
+    monkeypatch.delenv("BRINK_LIVE_MODEL", raising=False)
+    monkeypatch.delenv("SPACE_ID", raising=False)
+    assert live.allowed_models() is None and live.check_model("any/model") == "any/model"  # local: anything
+    monkeypatch.setenv("SPACE_ID", "me/brink")  # on a Hugging Face Space
+    monkeypatch.setattr(live, "has_gpu", lambda: False)
+    assert live.allowed_models() == [live.CPU_MODEL]  # Tiny Aya can't run on a CPU Space
+    with pytest.raises(ValueError):
+        live.check_model("someone/huge-70b")
+    monkeypatch.setattr(live, "has_gpu", lambda: True)
+    assert live.check_model(live.GPU_MODEL) == live.GPU_MODEL
+    monkeypatch.setenv("BRINK_ALLOW_ANY_MODEL", "1")
+    assert live.allowed_models() is None
+
+
+def test_only_the_owner_can_stop_a_run(tiny, tmp_path):
+    model_id, loader = tiny
+    mgr = LiveManager(tmp_path / "runs")
+    run = mgr.start(_cfg(model_id, max_steps=40), owner="alice", data=_live_data(), loader=loader, say=lambda m: None)
+    assert mgr.stop("mallory") is False and mgr.running
+    assert mgr.stop("alice") is True
+    for _ in range(600):
+        if not mgr.running:
+            break
+        time.sleep(0.1)
+    assert read_status(run)["state"] == "stopped"

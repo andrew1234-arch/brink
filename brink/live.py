@@ -34,6 +34,7 @@ from pathlib import Path
 GPU_MODEL = "CohereLabs/tiny-aya-global"  # the model every experiment uses (3.35B, needs a GPU)
 CPU_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"  # small instruct model with real refusals, for CPU-only machines
 MODEL_LOCK = threading.Lock()  # one model job at a time in this process (a live run or a gate upload)
+REPAIR_POLICIES = ("log", "halt", "rollback", "guard", "rollback_guard", "guard_always")  # = brink.repair.POLICIES
 STAGES = ["data", "fingerprint", "gate", "unprotected", "brink", "verify"]
 STAGE_TITLES = {
     "data": "Load data",
@@ -62,6 +63,26 @@ def has_gpu() -> bool:
 
 def default_model() -> str:
     return os.environ.get("BRINK_LIVE_MODEL") or (GPU_MODEL if has_gpu() else CPU_MODEL)
+
+
+def allowed_models() -> list[str] | None:
+    """Models a visitor may run. None means any model (local use). On a Hugging Face Space (SPACE_ID is set) only
+    the listed ones, so a visitor can't make the Space download an arbitrary model. BRINK_ALLOW_ANY_MODEL=1 or 0
+    overrides. Without a GPU, Tiny Aya is left out: it would not fit a CPU Space."""
+    flag = os.environ.get("BRINK_ALLOW_ANY_MODEL")
+    if (flag == "1") if flag is not None else not os.environ.get("SPACE_ID"):
+        return None
+    models = [GPU_MODEL, CPU_MODEL] if has_gpu() else [CPU_MODEL]
+    extra = os.environ.get("BRINK_LIVE_MODEL")
+    return models + ([extra] if extra and extra not in models else [])
+
+
+def check_model(model_id: str) -> str:
+    model_id = (model_id or default_model()).strip()
+    allowed = allowed_models()
+    if allowed is not None and model_id not in allowed:
+        raise ValueError(f"model {model_id!r} is not available here; choose one of {', '.join(allowed)}")
+    return model_id
 
 
 @dataclass
@@ -95,6 +116,12 @@ class LiveConfig:
 
     def __post_init__(self):
         self.model_id = self.model_id or default_model()
+        if not 0 <= self.contamination <= 0.9 or not 0 <= self.gate_drop_frac < 1:
+            raise ValueError("contamination and gate_drop_frac must be shares between 0 and 1")
+        if not 1 <= self.max_steps <= 1000 or not 2 <= self.n_train <= 100_000:
+            raise ValueError("max_steps or n_train out of range")
+        if self.policy not in REPAIR_POLICIES:
+            raise ValueError(f"policy must be one of {REPAIR_POLICIES}")
 
     @classmethod
     def from_dict(cls, d: dict) -> LiveConfig:
@@ -593,6 +620,7 @@ class LiveManager:
 
     def __init__(self, root: Path):
         self.root = Path(root)
+        self.owner: str | None = None  # who started the current run (a browser session); only they can stop it
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -602,7 +630,7 @@ class LiveManager:
     def running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
-    def start(self, cfg: LiveConfig, **kw) -> Path:
+    def start(self, cfg: LiveConfig, owner: str | None = None, **kw) -> Path:
         with self._lock:
             if self.running:
                 return self.current
@@ -611,7 +639,7 @@ class LiveManager:
             self._stop.clear()
             run_dir = self.root / time.strftime("%Y%m%d-%H%M%S")
             run_dir.mkdir(parents=True, exist_ok=True)
-            self.current = run_dir
+            self.current, self.owner = run_dir, owner
 
             def work():
                 try:
@@ -625,8 +653,12 @@ class LiveManager:
             self._thread.start()
             return run_dir
 
-    def stop(self) -> None:
+    def stop(self, owner: str | None = None) -> bool:
+        """Stop the current run. Only its owner can stop it (when it has one). Returns whether it was stopped."""
+        if not self.running or (self.owner is not None and owner != self.owner):
+            return False
         self._stop.set()
+        return True
 
     def latest(self, *extra_roots: Path) -> Path | None:
         """The current run, else the newest run (with a status.json) under the root or `extra_roots`."""
@@ -711,8 +743,12 @@ def gate_pairs(
     max_len: int = 512,
     loader=None,
     data: LiveData | None = None,
+    progress: Callable[[float, str], None] | None = None,
 ) -> list[dict]:
-    """Score every pair by how much one training step on it would erode refusal. Riskiest first."""
+    """Score every pair by how much one training step on it would erode refusal. Riskiest first.
+
+    `progress(fraction, description)` is called as the job advances (for a progress bar)."""
+    progress = progress or (lambda f, d: None)
     import numpy as np
 
     from brink.data import tokenize_sft
@@ -720,12 +756,16 @@ def gate_pairs(
     from brink.runner import release_gpu
 
     loader = loader or make_live_loader(model_id)
+    progress(0.0, "Fingerprinting the model (first time only for this model)")
     fp, data = fingerprint_for(model_id, cache_dir, loader, data)
+    progress(0.15, "Loading the model")
     model, tok = loader()
     ok = [i for i, p in enumerate(pairs) if tokenize_sft(tok, [p], max_len)]
     scorer = GateScorer(model, tok, fp, data.harmful_probe, data.harmless_probe, ("S3",), max_len=max_len, batch_size=2)
     scores = np.full(len(pairs), np.nan)
-    scores[ok] = scorer.score([pairs[i] for i in ok], log_every=0)[scorer.primary]
+    todo = [pairs[i] for i in ok]
+    tick = lambda i, n: progress(0.2 + 0.8 * i / max(n, 1), f"Scoring sample {i} of {n}")  # noqa: E731
+    scores[ok] = scorer.score(todo, log_every=0, on_progress=tick)[scorer.primary]
     del scorer, model
     release_gpu()
     filled = np.where(np.isnan(scores), -np.inf, scores)

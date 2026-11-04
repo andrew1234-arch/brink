@@ -160,7 +160,13 @@ def objective_gradient(model, tok, fp, harmful, harmless, target="S3", batch_siz
 
 
 def grad_scores(
-    model, tok, pairs: list[Pair], targets: dict[str, list[torch.Tensor]], max_len: int = 1024, log_every: int = 100
+    model,
+    tok,
+    pairs: list[Pair],
+    targets: dict[str, list[torch.Tensor]],
+    max_len: int = 1024,
+    log_every: int = 100,
+    on_progress=None,
 ) -> dict[str, np.ndarray]:
     """One backward per sample, scored against every target gradient.
 
@@ -203,6 +209,8 @@ def grad_scores(
         for t, d in dots.items():
             out_arrays[f"grad_dot_{t}"][i] = d
             out_arrays[f"grad_{t}"][i] = d / max(gn * t_norm[t], 1e-12)
+        if on_progress is not None:
+            on_progress(i + 1, n)
         if log_every and (i + 1) % log_every == 0:
             rate = (i + 1) / (time.time() - t0)
             print(f"[gate] scored {i + 1}/{n}  ({rate:.1f}/s, ~{(n - i - 1) / rate / 60:.1f} min left)", flush=True)
@@ -282,8 +290,9 @@ class GateScorer:
         }
         self.target_seconds = time.time() - t0
 
-    def score(self, pairs: list[Pair], log_every: int = 100) -> dict[str, np.ndarray]:
-        return grad_scores(self.model, self.tok, pairs, self.g_targets, self.max_len, log_every)
+    def score(self, pairs: list[Pair], log_every: int = 100, on_progress=None) -> dict[str, np.ndarray]:
+        """`on_progress(done, total)` is called after every sample."""
+        return grad_scores(self.model, self.tok, pairs, self.g_targets, self.max_len, log_every, on_progress)
 
     def rep(self, pairs: list[Pair], unsafe: list[Pair], safe: list[Pair], layer: int | None = None) -> np.ndarray:
         layer = self.fp.layer if layer is None else layer

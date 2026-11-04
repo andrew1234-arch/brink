@@ -63,6 +63,7 @@ CSS = """
 .brink-banner b { font-weight: 650; }
 """
 CSS += LIVE_CSS
+MAX_UPLOAD = "10mb"  # "Gate your data" uploads
 
 STATUS_STYLE = {
     "alarm": ("critical", "!", "ALARM"),
@@ -354,6 +355,7 @@ def main():
         share=args.share,
         css=CSS,
         js="() => { document.body.classList.remove('dark'); }",
+        max_file_size=MAX_UPLOAD,
     )
 
 
