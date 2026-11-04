@@ -55,8 +55,16 @@ make test        # offline CPU test suite: tiny random models, nothing downloade
 ```
 
 ```bash
-make demo        # the monitor dashboard on clearly labelled simulated runs
+make app         # the app: run Brink end to end on a real model, gate your own data, browse the experiments
 ```
+
+### See it work end to end
+
+The app's **Run Brink** tab runs the whole product live on a real model: it fingerprints the model, gates a
+contaminated fine-tuning set, fine-tunes twice on it (unprotected, and with Brink's alarm and repair), and
+verifies both on held-out harmful and harmless prompts, with a plain-language verdict. Tiny Aya on a GPU; a
+0.5B model on CPU. **Gate your data** scores any fine-tuning file you upload and hands back a cleaned file.
+See [docs/DASHBOARD.md](docs/DASHBOARD.md). `make live` records the same run headless.
 
 ### Use it in your own fine-tuning
 
@@ -96,6 +104,7 @@ trainer.train()
 | 02 | [repair](docs/REPAIR.md) | Does rollback + erosion guard beat safety-data mixing, ReSta and steering? |
 | 03 | [multilingual](docs/MULTILINGUAL.md) | Does English fine-tuning erode safety in Hindi and Tagalog, and does English-only monitoring miss it? |
 | 04 | [pipeline](docs/PIPELINE.md) | Does the full Lexsi pipeline deliver a safe, useful Hindi assistant from contaminated data? |
+| live | [end to end](docs/DASHBOARD.md#run-brink-end-to-end-live) | The whole product on Tiny Aya in one run: gate, monitor, repair, verify (recorded for the Space) |
 
 **Run everything:**
 - **Kaggle:** [`notebooks/kaggle_run_all.ipynb`](notebooks/kaggle_run_all.ipynb). It saves results after
@@ -130,7 +139,7 @@ Published: fingerprints, results, and Brink-protected adapters.
 
 - [Architecture](docs/ARCHITECTURE.md): components, design decisions, repository layout.
 - [Related work](docs/RELATED_WORK.md): prior work, and what Brink does and doesn't claim.
-- [Dashboard](docs/DASHBOARD.md): the monitor UI and Hugging Face Space.
+- [The app](docs/DASHBOARD.md): Run Brink live, Gate your data, the experiment dashboard, the Space.
 - [Submission](docs/SUBMISSION.md): write-up, Demo Day and video scripts.
 - [Upstream feedback](docs/UPSTREAM.md): for the Lexsi toolkits.
 

@@ -1,4 +1,9 @@
-# Dashboard only (CPU is enough). The training / probing code needs the full stack in pyproject.toml.
+# The Space: dashboard, live runs and the data gate. CPU is enough; a GPU (t4-small) runs Tiny Aya live.
 gradio==6.31.0       # pinned: CI tests this exact version and the Space deploys it
 plotly>=5
 numpy
+torch>=2.4
+transformers>=4.56
+peft>=0.13
+datasets>=2.20
+pyyaml

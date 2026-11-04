@@ -37,6 +37,9 @@ class FakeApi:
     def upload_folder(self, **kw):
         self.calls.append(("upload", kw["repo_id"], kw))
 
+    def add_space_secret(self, repo_id, key, value, **kw):
+        self.calls.append(("secret", repo_id, {"key": key, "value": value}))
+
     def kinds(self):
         return [c[0] for c in self.calls]
 
@@ -275,3 +278,14 @@ def test_workflows_do_not_interpolate_into_shell():
         for job in doc["jobs"].values():
             for step in job.get("steps", []):
                 assert "${{" not in step.get("run", ""), f"{wf.name}: {step.get('name') or step['run'][:40]}"
+
+
+def test_space_token_becomes_the_space_secret(repo, tmp_path):
+    clone, _, _ = repo
+    api = FakeApi()
+    deploy(clone, "me/brink", False, "workflow_run", tmp_path / "space", api=api, ci_check=lambda s: True,
+           marker_reader=lambda s, a: None, space_token="hf_read")  # fmt: skip
+    assert ("secret", "me/brink", {"key": "HF_TOKEN", "value": "hf_read"}) in api.calls
+    without = FakeApi()
+    _run(clone, tmp_path, without)
+    assert "secret" not in without.kinds()

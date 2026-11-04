@@ -134,13 +134,18 @@ Runs on dense checkpoints (every `M` steps) to build the behavioural curve the m
 - Cost: GPU-seconds per probe vs per HarmBench eval.
 - Pareto plot: safety vs capability vs compute for every condition.
 
-### 3.6 `app/`: monitor dashboard (Gradio, HF Spaces)
-Built: see [DASHBOARD.md](DASHBOARD.md). It reads any run folder (finished, or still being written) and
+### 3.6 `app/`: the product and the dashboard (Gradio, HF Spaces)
+Built: see [DASHBOARD.md](DASHBOARD.md). Three tabs:
+- **Run Brink** runs the whole pipeline live on a real model (`brink/live.py`): fingerprint, gate a
+  contaminated fine-tuning set, fine-tune unprotected vs with Brink (alarm + repair), verify both on held-out
+  prompts. Tiny Aya on a GPU, a 0.5B model on CPU. `experiments/live.py` records the same run headless.
+- **Gate your data** scores an uploaded fine-tuning file and returns the ranked samples and a cleaned file.
+- **Experiments** reads any run folder (finished, or still being written) and
 recomputes the alarm from the logs with an adjustable rule (signal, z threshold, persistence, CUSUM). It shows
 status, alarm vs behaviour-break step and lead time, probe-vs-eval cost, the signal curves, the ASR ground
 truth, per-layer erosion, and the gate results. Live mode follows a run as it trains, e.g. from a Kaggle
-notebook with a public share link. It needs no ML stack, so it runs on a free CPU Space. Still to do: a
-side-by-side chat with the drifted vs protected model, which needs a GPU.
+notebook with a public share link. The Experiments tab needs no ML stack; the first two tabs need the
+training stack (installed on the Space). Model replies are judged but never shown or stored.
 
 ### 3.7 Integrations (built)
 - **Hugging Face Trainer / TRL:** `BrinkCallback` runs the monitor on `on_step_end`, the guard on
@@ -208,13 +213,14 @@ brink/
 │   ├── eval/               # behavioural ASR (WildGuard / keyword), capability, AuditKIT red-team
 │   ├── analysis/           # one module per experiment: verdicts, reports, plots
 │   ├── dashboard/          # run loading, live metrics, Plotly figures (no ML dependencies)
+│   ├── live.py             # Brink end to end in one call: the "Run Brink" tab and experiments/live.py
 │   ├── data.py             # datasets and disjoint splits for every experiment
 │   ├── runner.py           # shared calibration and monitored-run plumbing
 │   └── train_loop.py       # LoRA SFT loop with controller hooks
-├── experiments/            # entry points: preflight, go_nogo, gate, repair, multilingual, pipeline, run_all
+├── experiments/            # entry points: preflight, go_nogo, gate, repair, multilingual, pipeline, live, run_all
 ├── configs/                # one YAML per experiment
 ├── notebooks/              # Kaggle notebooks (kaggle_run_all.ipynb runs everything)
-├── app/                    # Gradio dashboard
+├── app/                    # Gradio app: Run Brink, Gate your data, Experiments
 ├── scripts/                # Hugging Face Space build, Hub publishing
 ├── results/                # small CSV / JSON / Markdown / PNG outputs (large artifacts never committed)
 ├── tests/                  # offline CPU tests on tiny random models

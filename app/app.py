@@ -1,4 +1,10 @@
-"""Brink monitor dashboard.
+"""Brink: the working product and the experiment dashboard.
+
+Tabs:
+    Run Brink        the whole pipeline live on a real model: fingerprint, gate, fine-tune unprotected vs with
+                     Brink (alarm + repair), verify. Needs the training stack; a GPU for Tiny Aya.
+    Gate your data   upload a fine-tuning file, get every sample's risk score and a cleaned file.
+    Experiments      browse the experiment runs (and live runs) under --results.
 
     python app/app.py                         # browse real runs under results/
     python app/app.py --results path/to/runs  # any folder of runs (a run = a folder with fingerprint.json)
@@ -26,6 +32,9 @@ import gradio as gr
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # live_tab sits next to this file (also on the Space)
+
+from live_tab import LIVE_CSS, build_gate_tab, build_live_tab
 
 from brink.dashboard import figures as F
 from brink.dashboard.metrics import AlarmRule, alarm_step, behaviour_break, kpis, rule_from_run, status
@@ -53,6 +62,7 @@ CSS = """
   padding: 10px 14px; background: var(--b-surface); color: var(--b-ink); font-size: 14px; }
 .brink-banner b { font-weight: 650; }
 """
+CSS += LIVE_CSS
 
 STATUS_STYLE = {
     "alarm": ("critical", "!", "ALARM"),
@@ -183,7 +193,27 @@ EVAL_HEADERS = ["step", "ASR", "refusal rate", "ASR (keyword)", "z S1", "z S2", 
 
 
 def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
-    label_root = label_root or results_root
+    with gr.Blocks(title="Brink") as demo:
+        gr.HTML(
+            '<div class="brink-root brink-header"><h1>Brink · keep a model safe while you fine-tune it</h1>'
+            "<p>Gates risky training data, watches the model's refusal mechanism during fine-tuning, raises "
+            "the alarm before behaviour breaks and repairs the damage.</p></div>"
+        )
+        dark = gr.Checkbox(False, label="Dark mode", render=False)  # shown at the bottom, used by every tab
+        dark.change(None, dark, None, js="(d) => { document.body.classList.toggle('dark', d); }")
+        with gr.Tab("Run Brink"):
+            build_live_tab(results_root, dark)
+        with gr.Tab("Gate your data"):
+            build_gate_tab(results_root, dark)
+        with gr.Tab("Experiments"):
+            load = experiments_tab(results_root, label_root or results_root, dark)
+        dark.render()
+        demo.load(*load)
+    return demo
+
+
+def experiments_tab(results_root: Path, label_root: Path, dark: gr.Checkbox) -> tuple:
+    """The experiment browser. Returns the (fn, inputs, outputs) to run when the page loads."""
 
     def run_choices():
         out = []
@@ -191,7 +221,8 @@ def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
             r = load_run(p)
             rel = p.relative_to(label_root) if p != label_root and label_root in p.parents else Path(p.name)
             out.append((f"{rel} · {r.kind}" + (" · simulated" if r.simulated else ""), str(p), r.kind))
-        out.sort(key=lambda x: (x[2] != "go_nogo", x[0]))  # go / no-go runs first
+        order = {"live": 0, "go_nogo": 1}  # end-to-end runs first, then go / no-go
+        out.sort(key=lambda x: (order.get(x[2], 2), x[0]))
         return [(label, path) for label, path, _ in out]
 
     def pick_condition(run: Run) -> str | None:
@@ -209,8 +240,8 @@ def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
         rule = rule_from_run(run)
         return (gr.update(choices=list(run.conditions), value=pick_condition(run)), gr.update(value=rule.threshold))
 
-    def refresh(run_path, cond_name, signal, method, thr, persist, dark):
-        mode = "dark" if dark else "light"
+    def refresh(run_path, cond_name, signal, method, thr, persist, is_dark):
+        mode = "dark" if is_dark else "light"
         run = load_run(Path(run_path)) if run_path else None
         rule = rule_from_run(run, signal) if run else AlarmRule(signal=signal)
         rule.method, rule.threshold, rule.persistence = method, float(thr), int(persist)
@@ -238,67 +269,63 @@ def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
     first = choices[0][1] if choices else None
     first_run = load_run(Path(first)) if first else None
 
-    with gr.Blocks(title="Brink monitor") as demo:
-        gr.HTML(
-            '<div class="brink-root brink-header"><h1>Brink · safety monitor</h1>'
-            "<p>Watches a model's refusal mechanism during fine-tuning and raises the alarm before its "
-            "behaviour breaks.</p></div>"
+    gr.HTML(
+        '<div class="brink-root"><p>Every experiment run (and every live run) as a monitor: signals, the alarm, '
+        "ground-truth attack success, per-layer erosion and the data gate. The alarm rule can be changed live."
+        "</p></div>"
+    )
+    with gr.Row():
+        run_dd = gr.Dropdown(choices=choices, value=first, label="Run", scale=3)
+        cond_dd = gr.Dropdown(
+            choices=list(first_run.conditions) if first_run else [],
+            value=pick_condition(first_run) if first_run else None,
+            label="Condition",
+            scale=1,
         )
-        with gr.Row():
-            run_dd = gr.Dropdown(choices=choices, value=first, label="Run", scale=3)
-            cond_dd = gr.Dropdown(
-                choices=list(first_run.conditions) if first_run else [],
-                value=pick_condition(first_run) if first_run else None,
-                label="Condition",
-                scale=1,
+        signal = gr.Radio(["S3", "S1", "S2"], value="S3", label="Alarm signal", scale=1)
+        method = gr.Radio(
+            [("z threshold", "threshold"), ("CUSUM", "cusum")], value="threshold", label="Alarm rule", scale=1
+        )
+    with gr.Row():
+        thr = gr.Slider(
+            -8,
+            -1,
+            value=rule_from_run(first_run).threshold if first_run else -3.0,
+            step=0.5,
+            label="z threshold",
+            scale=2,
+        )
+        persist = gr.Slider(1, 5, value=2, step=1, label="Consecutive probes", scale=2)
+        live = gr.Checkbox(False, label="Live (every 5 s)", scale=1)
+        refresh_btn = gr.Button("Refresh", scale=1)
+    banner = gr.HTML()
+    tiles = gr.HTML()
+    p_sig = gr.Plot(show_label=False)
+    p_asr = gr.Plot(show_label=False)
+    with gr.Tabs():
+        with gr.Tab("Layers"):
+            p_layers = gr.Plot(show_label=False)
+        with gr.Tab("Across conditions"):
+            p_cmp = gr.Plot(show_label=False)
+        with gr.Tab("Data gate"):
+            p_gh = gr.Plot(show_label=False)
+            p_gs = gr.Plot(show_label=False)
+        with gr.Tab("Tables"):
+            t_alarm = gr.Dataframe(headers=ALARM_HEADERS, label="Alarm summary (current rule)", interactive=False)
+            t_eval = gr.Dataframe(
+                headers=EVAL_HEADERS, label="Behavioural evals, selected condition", interactive=False
             )
-            signal = gr.Radio(["S3", "S1", "S2"], value="S3", label="Alarm signal", scale=1)
-            method = gr.Radio(
-                [("z threshold", "threshold"), ("CUSUM", "cusum")], value="threshold", label="Alarm rule", scale=1
-            )
-        with gr.Row():
-            thr = gr.Slider(
-                -8,
-                -1,
-                value=rule_from_run(first_run).threshold if first_run else -3.0,
-                step=0.5,
-                label="z threshold",
-                scale=2,
-            )
-            persist = gr.Slider(1, 5, value=2, step=1, label="Consecutive probes", scale=2)
-            live = gr.Checkbox(False, label="Live (every 5 s)", scale=1)
-            dark = gr.Checkbox(False, label="Dark", scale=1)
-            refresh_btn = gr.Button("Refresh", scale=1)
-        banner = gr.HTML()
-        tiles = gr.HTML()
-        p_sig = gr.Plot(show_label=False)
-        p_asr = gr.Plot(show_label=False)
-        with gr.Tabs():
-            with gr.Tab("Layers"):
-                p_layers = gr.Plot(show_label=False)
-            with gr.Tab("Across conditions"):
-                p_cmp = gr.Plot(show_label=False)
-            with gr.Tab("Data gate"):
-                p_gh = gr.Plot(show_label=False)
-                p_gs = gr.Plot(show_label=False)
-            with gr.Tab("Tables"):
-                t_alarm = gr.Dataframe(headers=ALARM_HEADERS, label="Alarm summary (current rule)", interactive=False)
-                t_eval = gr.Dataframe(
-                    headers=EVAL_HEADERS, label="Behavioural evals, selected condition", interactive=False
-                )
-        timer = gr.Timer(5, active=False)
+    timer = gr.Timer(5, active=False)
 
-        inputs = [run_dd, cond_dd, signal, method, thr, persist, dark]
-        outputs = [banner, tiles, p_sig, p_asr, p_layers, p_cmp, p_gh, p_gs, t_alarm, t_eval]
-        run_dd.change(on_run, run_dd, [cond_dd, thr]).then(refresh, inputs, outputs)
-        for ctl in (cond_dd, signal, method, thr, persist, dark):
-            ctl.change(refresh, inputs, outputs)
-        dark.change(None, dark, None, js="(d) => { document.body.classList.toggle('dark', d); }")
-        refresh_btn.click(rediscover, run_dd, run_dd).then(refresh, inputs, outputs)
-        live.change(lambda v: gr.Timer(active=v), live, timer)
-        timer.tick(refresh, inputs, outputs)
-        demo.load(refresh, inputs, outputs)
-    return demo
+    inputs = [run_dd, cond_dd, signal, method, thr, persist, dark]
+    outputs = [banner, tiles, p_sig, p_asr, p_layers, p_cmp, p_gh, p_gs, t_alarm, t_eval]
+    run_dd.change(on_run, run_dd, [cond_dd, thr]).then(refresh, inputs, outputs)
+    for ctl in (cond_dd, signal, method, thr, persist, dark):
+        ctl.change(refresh, inputs, outputs)
+    refresh_btn.click(rediscover, run_dd, run_dd).then(refresh, inputs, outputs)
+    live.change(lambda v: gr.Timer(active=v), live, timer)
+    timer.tick(refresh, inputs, outputs)
+    return refresh, inputs, outputs
 
 
 def main():

@@ -48,16 +48,22 @@ sdk: gradio
 sdk_version: {gradio_pin()}
 python_version: "3.12"
 app_file: app.py
+suggested_hardware: t4-small
 pinned: false
 license: mit
 short_description: Catches LLM safety collapse during fine-tuning
 ---
 
-# Brink · safety monitor
+# Brink · keep a model safe while you fine-tune it
 
-Watches a model's refusal mechanism while it is fine-tuned and raises the alarm before its behaviour breaks.
-Shows the alarm, the probe signals, the ground-truth attack success rate, per-layer erosion and the data-gate
-results for every experiment run. The alarm rule can be changed live.
+- **Run Brink:** the whole pipeline live on a real model. Brink fingerprints the model's refusal mechanism,
+  gates a contaminated fine-tuning set, fine-tunes the model twice (unprotected, and with Brink's alarm and
+  repair), then verifies both on held-out prompts. On a GPU it runs Tiny Aya; on CPU a 0.5B model.
+- **Gate your data:** upload a fine-tuning file and get every sample's risk score and a cleaned file.
+- **Experiments:** every experiment run, with the alarm rule adjustable live.
+
+Live runs load AdvBench and HarmBench, which are gated on Hugging Face: accept their terms and add a read
+token as the Space secret `HF_TOKEN`.
 
 Code: https://github.com/andrew1234-arch/brink
 """
@@ -100,6 +106,8 @@ def build(out: Path, results: Path | None, demo: bool) -> Path:
         shutil.rmtree(out)
     out.mkdir(parents=True)
     shutil.copy2(ROOT / "app" / "app.py", out / "dashboard.py")  # not app.py: the Space entry point is app.py
+    shutil.copy2(ROOT / "app" / "live_tab.py", out / "live_tab.py")
+    shutil.copytree(ROOT / "app" / "examples", out / "examples")
     shutil.copytree(ROOT / "brink", out / "brink", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy2(REQUIREMENTS, out / "requirements.txt")
     (out / "README.md").write_text(space_readme())

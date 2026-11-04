@@ -60,7 +60,7 @@ class Condition:
 @dataclass
 class Run:
     path: Path
-    kind: str  # "go_nogo" | "gate" | "unknown"
+    kind: str  # "go_nogo" | "gate" | "live" | "unknown"
     conditions: dict[str, Condition]
     fingerprint: dict | None = None
     summary: dict | None = None
@@ -104,7 +104,9 @@ def load_run(path: Path) -> Run:
         )
     meta = _json(path / "meta.json") or {}
     scores = read_rows_any(path / "scores.csv")
-    kind = "gate" if scores or (path / "subsets.json").exists() else ("go_nogo" if conds else "unknown")
+    kind = meta.get("kind") or (
+        "gate" if scores or (path / "subsets.json").exists() else ("go_nogo" if conds else "unknown")
+    )
     return Run(
         path,
         kind,

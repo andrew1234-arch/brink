@@ -1,11 +1,46 @@
-# Monitor dashboard
+# The Brink app
 
-A Gradio app that shows what Brink sees during fine-tuning, for any experiment run: finished, or still
-being written.
+A Gradio app with three tabs. The first two are the working product; the third browses the experiments.
+
+| Tab | What it does |
+|---|---|
+| **Run Brink** | Runs the whole pipeline live on a real model and verifies the result (below) |
+| **Gate your data** | Upload a fine-tuning file (`.jsonl`, `.json` or `.csv`); get every sample's risk score, a scored CSV and a cleaned JSONL |
+| **Experiments** | Every experiment run (and live run) as a monitor, with the alarm rule adjustable live |
 
 ```bash
-pip install -r app/requirements.txt          # gradio, plotly, numpy: no ML stack needed
+pip install -e ".[dashboard]"                # the app with the training stack (live runs, gate uploads)
 ```
+
+## Run Brink: end to end, live
+
+One click runs, on a real model, in this order (`brink/live.py`):
+
+1. **Load data:** a contaminated fine-tuning set (benign task samples plus a chosen share of harmful-compliance
+   samples), held-out harmful and harmless prompts, and held-out task data.
+2. **Fingerprint** the model's refusal mechanism (refusal direction, layer, refusal tokens, noise).
+3. **Gate the data:** score every training sample and drop the riskiest share. The UI shows how many of the
+   harmful samples the gate caught, against chance.
+4. **Fine-tune unprotected** on all of it, with the monitor only watching: the alarm shows when refusal starts
+   eroding.
+5. **Fine-tune with Brink** on the gated data with the alarm armed and the chosen repair policy (rollback +
+   erosion guard, halt, or guard from the start).
+6. **Verify** both final models: refusal on held-out harmful prompts, over-refusal on harmless prompts, and
+   held-out task loss, with a plain-language verdict and per-prompt results (refused / complied, never the
+   replies).
+
+Progress streams to the page every 2 seconds: stage cards, the refusal signal of both runs with the alarm and
+rollback marked, the outcome bars, the gate's decisions and a log. One run at a time; every visitor watches
+the same run. With a GPU it runs Tiny Aya (about 10 minutes); without one, `Qwen/Qwen2.5-0.5B-Instruct` on CPU
+(roughly 15-25 minutes). Any causal LM with a chat template can be typed into the model box.
+
+`experiments/live.py` (the `live` stage of `run_all` and the Kaggle notebook) records the same run on Tiny Aya
+into `results/live`; the tab shows that recorded run until someone starts a new one.
+
+Live runs load AdvBench and HarmBench, which are gated on Hugging Face: accept their terms and provide a read
+token as `HF_TOKEN` (on the Space: a Space secret, see below).
+
+## Experiments tab
 
 ```bash
 python app/app.py                            # real runs under results/
@@ -19,7 +54,10 @@ python app/app.py --results path/to/runs     # any folder of runs
 python app/app.py --demo                     # SIMULATED runs, clearly bannered, for trying the UI
 ```
 
-## What it shows
+The Experiments tab alone needs no ML stack (`pip install -r app/requirements.txt` installs everything,
+including the training stack for the other tabs).
+
+### What it shows
 
 | Area | Content |
 |---|---|
@@ -37,7 +75,7 @@ detection rule easy to show live on Demo Day.
 
 The page never shows model replies to harmful prompts; only rates and labels.
 
-## Live during training (Kaggle)
+### Live during training (Kaggle)
 
 In `notebooks/kaggle_go_nogo.ipynb`, set `LIVE_DASHBOARD = True` before the run cell. It prints a public
 `gradio.live` link; open it and tick **Live** to watch the signals and the alarm update as the model trains.
@@ -70,6 +108,7 @@ One-time setup, in the GitHub repo under **Settings â†’ Secrets and variables â†
 | Secret | `HF_TOKEN` | a Hugging Face token with **write** access |
 | Variable | `HF_SPACE_ID` | e.g. `your-hf-username/brink` (the Space is created if it doesn't exist) |
 | Variable | `HF_SPACE_PUBLIC` | `true` to make it public; anything else keeps it private |
+| Secret | `HF_SPACE_TOKEN` | optional **read** token with access to AdvBench and HarmBench; installed as the Space's `HF_TOKEN` so live runs can load them |
 
 While `HF_SPACE_ID` is unset, the deploy job is skipped. While `HF_TOKEN` is unset, the deploy step is skipped
 with a notice rather than failing.

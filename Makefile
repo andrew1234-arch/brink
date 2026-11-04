@@ -1,7 +1,7 @@
 # Common tasks. Python and pip are whatever is on PATH (use a virtual environment).
 PY ?= python
 
-.PHONY: help install install-all lint format test demo space run-all dry-run
+.PHONY: help install install-all lint format test app demo live space run-all dry-run
 
 help:            ## list targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -24,6 +24,12 @@ format:          ## apply ruff fixes and formatting
 
 test:            ## offline CPU test suite (tiny random models, no downloads)
 	HF_HUB_OFFLINE=1 $(PY) -m pytest -q
+
+app:             ## the app: Run Brink live, Gate your data, Experiments (results/)
+	$(PY) app/app.py
+
+live:            ## Brink end to end, headless, recorded to results/live (Tiny Aya needs a GPU)
+	$(PY) experiments/live.py
 
 demo:            ## dashboard on clearly labelled simulated runs
 	$(PY) app/app.py --demo

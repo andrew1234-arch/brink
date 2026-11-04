@@ -4,6 +4,8 @@ Configuration comes from the environment, never from interpolation into shell:
     HF_TOKEN          Hugging Face token with write access (without it the deploy is skipped with a notice)
     HF_SPACE_ID       e.g. your-hf-username/brink
     HF_SPACE_PUBLIC   "true" for a public Space; anything else keeps it private. Applied on every deploy.
+    HF_SPACE_TOKEN    optional READ token, installed as the Space secret HF_TOKEN so live runs can load the gated
+                      datasets (AdvBench, HarmBench). Use a read-only token: the Space runs code with it.
     DEPLOY_EVENT      the GitHub event: workflow_run (after CI passed), schedule or workflow_dispatch
     GITHUB_TOKEN, GITHUB_REPOSITORY   used to confirm CI passed for this commit on schedule / manual runs
 
@@ -131,6 +133,7 @@ def deploy(
     api=None,
     ci_check=ci_passed,
     marker_reader=deployed_marker,
+    space_token: str | None = None,
 ) -> str:
     code = git(repo, "rev-parse", "HEAD").stdout.strip()
     if event == "workflow_run":  # CI passed for `code`; deploy it only if nothing newer reached main since
@@ -156,6 +159,8 @@ def deploy(
     (folder / MARKER).write_text(json.dumps(marker, indent=2))
     what = f"{len(stages)} finished experiment(s)" if stages else "SIMULATED demo runs"
     push(folder, space_id, public, api=api, message=f"Deploy {code[:7]} with {what}")
+    if space_token:
+        api.add_space_secret(space_id, "HF_TOKEN", space_token, description="read token for gated datasets")
     return f"deployed {mode} ({what}) at {code[:7]}"
 
 
@@ -169,7 +174,15 @@ def main() -> int:
     from huggingface_hub import HfApi
 
     try:
-        status = deploy(ROOT, space_id, public, event, ROOT / "build" / "space", api=HfApi(token=token))
+        status = deploy(
+            ROOT,
+            space_id,
+            public,
+            event,
+            ROOT / "build" / "space",
+            api=HfApi(token=token),
+            space_token=os.environ.get("HF_SPACE_TOKEN", "").strip() or None,
+        )
     except DeployError as e:
         print(f"::error::{e}")
         return 1

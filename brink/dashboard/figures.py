@@ -369,3 +369,121 @@ def fig_gate_subsets(run: Run, rule: AlarmRule, mode: str = "light") -> go.Figur
     fig = fig_asr(sub, rule, None, mode)
     fig.update_layout(title={"text": "ASR after fine-tuning on benign subsets chosen by the gate"})
     return fig
+
+
+# --------------------------------------------------------------------------- live end-to-end run
+
+LIVE_SERIES = {"unprotected": ("Unprotected", 1), "brink": ("With Brink", 0)}  # fixed slots: orange, blue
+
+
+def fig_live_signals(
+    run: Run | None, events: dict[str, list[dict]], threshold: float, max_steps: int, mode: str = "light"
+) -> go.Figure:
+    """Refusal log-odds (z) of both fine-tunes on one axis, with the alarm, rollback and halt marked."""
+    t = THEMES[mode]
+    title = "Is the model's refusal eroding? (z vs the model before fine-tuning; lower = eroding)"
+    conds = [run.conditions[c] for c in LIVE_SERIES if run is not None and c in run.conditions]
+    if not any(c.probe for c in conds):
+        return _empty(t, title, "Starts when fine-tuning starts")
+    fig = _base(t, title, "z (refusal log-odds)", height=360)
+    values = [threshold]
+    for c in conds:
+        label, slot = LIVE_SERIES[c.name]
+        steps, z = z_series(c, "S3")
+        values += [v for v in z if v is not None]
+        fig.add_trace(
+            go.Scatter(
+                x=steps,
+                y=z,
+                mode="lines+markers",
+                name=label,
+                line={"color": _slot(t, slot), "width": 2.5},
+                marker={"size": 6},
+                hovertemplate=f"{label}: %{{y:.2f}}<extra></extra>",
+            )
+        )
+        last = next(((x, v) for x, v in zip(reversed(steps), reversed(z)) if v is not None), None)
+        if last:
+            _end_label(fig, t, last[0], last[1], label)
+    fig.add_hline(y=threshold, line={"color": t["muted"], "width": 1, "dash": "dash"})
+    fig.add_annotation(
+        x=1, xref="paper", y=threshold, xanchor="left", xshift=8, showarrow=False,
+        text=f"alarm z ≤ {threshold:g}", font={"color": t["muted"], "size": 11},
+    )  # fmt: skip
+    marks = {"alarm": "⚠ alarm", "rollback": "↺ rollback", "halt": "■ halted", "guard_on": "guard on"}
+    y = 0.99
+    for name, rows in events.items():
+        label = LIVE_SERIES.get(name, (name, 0))[0]
+        for e in rows:
+            text = marks.get(e.get("event"))
+            if text is None or e.get("step") is None or (e["event"] == "guard_on" and e["step"] == 0):
+                continue
+            x = int(e["step"])
+            fig.add_vline(x=x, line={"color": t["critical"] if e["event"] == "alarm" else t["ink2"], "width": 1.5})
+            fig.add_annotation(
+                x=x, y=y, yref="paper", yanchor="top", xanchor="left", xshift=4, showarrow=False,
+                text=f"{text} ({label.lower()})", font={"color": t["ink"], "size": 11},
+            )  # fmt: skip
+            y -= 0.07
+    fig.update_xaxes(range=[-0.5, max_steps + 0.5])
+    _headroom(fig, values, pad_top=0.35)
+    return fig
+
+
+def fig_live_outcomes(results: dict[str, dict | None], mode: str = "light") -> go.Figure:
+    """Before / unprotected / with Brink on the two behaviours that matter. `results` maps each to its metrics."""
+    t = THEMES[mode]
+    title = "Verified behaviour on held-out prompts"
+    if not any(results.values()):
+        return _empty(t, title, "Measured before and after each fine-tune")
+    fig = _base(t, title, "", height=300)
+    groups = [("refusal_rate", "Refuses harmful prompts<br>(higher is safer)"),
+              ("over_refusal", "Refuses harmless prompts<br>(lower is more useful)")]  # fmt: skip
+    colors = {"before": t["muted"], "unprotected": _slot(t, 1), "brink": _slot(t, 0)}
+    names = {"before": "Before fine-tuning", "unprotected": "Unprotected", "brink": "With Brink"}
+    for key in ("before", "unprotected", "brink"):
+        m = results.get(key)
+        if not m:
+            continue
+        vals = [m.get(k) for k, _ in groups]
+        fig.add_trace(
+            go.Bar(
+                x=[g for _, g in groups],
+                y=vals,
+                name=names[key],
+                marker={"color": colors[key]},
+                text=[("—" if v is None else f"{v:.0%}") for v in vals],
+                textposition="outside",
+                hovertemplate=f"{names[key]}: %{{y:.0%}}<extra></extra>",
+            )
+        )
+    fig.update_layout(barmode="group", hovermode="closest", bargap=0.3)
+    fig.update_xaxes(title_text="")
+    fig.update_yaxes(range=[0, 1.18], tickformat=".0%", tickvals=[0, 0.25, 0.5, 0.75, 1.0])
+    return fig
+
+
+def fig_upload_scores(risks: list[float | None], dropped: list[bool], mode: str = "light") -> go.Figure:
+    """Risk scores of an uploaded file, riskiest first, the dropped ones marked."""
+    t = THEMES[mode]
+    title = "Risk of each sample, riskiest first (above 0: training on it erodes refusal)"
+    pts = [(i + 1, r, d) for i, (r, d) in enumerate(zip(risks, dropped)) if r is not None]
+    if not pts:
+        return _empty(t, title, "No scores")
+    fig = _base(t, title, "risk (cosine)", height=300)
+    for flag, name, color in ((True, "dropped", t["critical"]), (False, "kept", _slot(t, 0))):
+        sel = [p for p in pts if p[2] == flag]
+        if sel:
+            fig.add_trace(
+                go.Bar(
+                    x=[p[0] for p in sel],
+                    y=[p[1] for p in sel],
+                    name=name,
+                    marker={"color": color},
+                    hovertemplate=f"#%{{x}} {name}: %{{y:.3f}}<extra></extra>",
+                )
+            )
+    fig.add_hline(y=0, line={"color": t["muted"], "width": 1})
+    fig.update_layout(bargap=0.1, hovermode="closest")
+    fig.update_xaxes(title_text="sample rank")
+    return fig

@@ -30,7 +30,8 @@ def test_space_build_excludes_sensitive_files(tmp_path):
 
     out = build(tmp_path / "space", _fake_results(tmp_path), demo=False)
     names = {p.name for p in out.rglob("*") if p.is_file()}
-    assert {"app.py", "dashboard.py", "README.md", "requirements.txt", "evals.csv", "REPORT.md"} <= names
+    assert {"app.py", "dashboard.py", "live_tab.py", "README.md", "requirements.txt", "evals.csv", "REPORT.md"} <= names
+    assert (out / "examples" / "finetune_sample.jsonl").exists()  # the "Gate your data" example
     assert not names & {"generations.jsonl", "adapter_model.safetensors", "adapter_config.json", "fingerprint.pt"}
     assert not (out / "results" / "simulated_go_nogo").exists()
     assert "sdk: gradio" in (out / "README.md").read_text()

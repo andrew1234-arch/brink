@@ -4,7 +4,7 @@
     python experiments/run_all.py --stages go_nogo gate   # a subset, in the given order
     python experiments/run_all.py --dry-run               # show what would run
 
-Order matters: `repair` and `pipeline` read the alarm threshold calibrated by `go_nogo`. A stage counts as done
+Order matters: `repair`, `pipeline` and `live` read the alarm threshold calibrated by `go_nogo`. A stage counts as done
 once its REPORT.md exists. Each stage runs preflight first and is skipped (not fatal) if preflight fails.
 """
 
@@ -21,8 +21,8 @@ sys.path.insert(0, str(ROOT))
 
 from brink.io import stage_finished
 
-STAGES = ["go_nogo", "gate", "repair", "multilingual", "pipeline"]
-HOURS_T4X2 = {"go_nogo": 4.0, "gate": 1.5, "repair": 2.7, "multilingual": 2.0, "pipeline": 1.5}
+STAGES = ["go_nogo", "gate", "repair", "multilingual", "pipeline", "live"]
+HOURS_T4X2 = {"go_nogo": 4.0, "gate": 1.5, "repair": 2.7, "multilingual": 2.0, "pipeline": 1.5, "live": 0.4}
 
 
 def done(stage: str, results: Path) -> bool:
@@ -54,7 +54,9 @@ def main() -> int:
         cfg = f"configs/{stage}.yaml"
         t0 = time.time()
         print(f"\n{'=' * 80}\n{stage}\n{'=' * 80}", flush=True)
-        if not args.skip_preflight and run([sys.executable, "experiments/preflight.py", "--config", cfg]) != 0:
+        # `live` (Brink end to end) validates its own model and data as its first stages.
+        preflight = [sys.executable, "experiments/preflight.py", "--config", cfg]
+        if stage != "live" and not args.skip_preflight and run(preflight) != 0:
             status[stage] = "skipped: preflight failed"
             continue
         rc = run([sys.executable, f"experiments/{stage}.py", "--config", cfg, "--out", f"{args.results}/{stage}"])

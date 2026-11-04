@@ -15,6 +15,7 @@ name: Deploy dashboard to Hugging Face Space
 #   variable HF_SPACE_ID       e.g. your-hf-username/brink   (the job is skipped while this is unset)
 #   Without HF_TOKEN the deploy step is skipped with a notice.
 #   variable HF_SPACE_PUBLIC   "true" for a public Space; anything else keeps it private (applied every deploy)
+#   secret   HF_SPACE_TOKEN    optional READ token, installed as the Space's HF_TOKEN for live runs (gated datasets)
 
 on:
   workflow_dispatch:
@@ -60,6 +61,7 @@ jobs:
       - name: Deploy
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_TOKEN: ${{ secrets.HF_SPACE_TOKEN }}
           HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
           HF_SPACE_PUBLIC: ${{ vars.HF_SPACE_PUBLIC }}
           DEPLOY_EVENT: ${{ github.event_name }}
