@@ -4,7 +4,8 @@ name: Deploy dashboard to Hugging Face Space
 # scripts/deploy_space.py; this file only wires up triggers and configuration.
 #
 # Triggers:
-#   - after CI passes on main (workflow_run): new code is deployed only once it's tested
+#   - after CI passes on a push to main in this repository (workflow_run): new code is deployed only once it's
+#     tested, and only while it is still the tip of main (a slow CI run on an older commit can't roll back)
 #   - hourly (schedule): picks up new results on the `results/all` branch. That branch holds only results, so a
 #     push to it can't trigger a workflow; the run does nothing if nothing changed.
 #   - manually (workflow_dispatch)
@@ -12,6 +13,7 @@ name: Deploy dashboard to Hugging Face Space
 # One-time setup (repo Settings → Secrets and variables → Actions):
 #   secret   HF_TOKEN          a Hugging Face token with WRITE access
 #   variable HF_SPACE_ID       e.g. your-hf-username/brink   (the job is skipped while this is unset)
+#   Without HF_TOKEN the deploy step is skipped with a notice.
 #   variable HF_SPACE_PUBLIC   "true" for a public Space; anything else keeps it private (applied every deploy)
 
 on:
@@ -27,15 +29,21 @@ permissions:
   contents: read
   actions: read
 
+# Automatic runs share one queue: a newer one may replace a queued one, which is fine because every run deploys
+# the latest state. A manual run has its own queue so the hourly schedule can never replace it.
 concurrency:
-  group: deploy-space
+  group: deploy-space-${{ github.event_name == 'workflow_dispatch' && 'manual' || 'auto' }}
   cancel-in-progress: false   # never interrupt an upload half-way
 
 jobs:
   deploy:
+    # workflow_run: only CI runs that succeeded for a push in this repository, never a fork's pull request.
     if: >-
       vars.HF_SPACE_ID != '' &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+      (github.event_name != 'workflow_run' || (
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

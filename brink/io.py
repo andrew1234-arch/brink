@@ -53,3 +53,18 @@ def write_json(path: Path, obj) -> None:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, indent=2, ensure_ascii=False))
+
+
+REPORT = "REPORT.md"
+
+
+def stage_finished(stage_dir: Path) -> bool:
+    """An experiment stage counts as finished once its analysis wrote REPORT.md (it is written last)."""
+    return (Path(stage_dir) / REPORT).is_file()
+
+
+def finished_stages(results: Path | None) -> list[str]:
+    """Names of the finished stage folders directly under `results`, sorted."""
+    if results is None or not Path(results).is_dir():
+        return []
+    return sorted(p.name for p in Path(results).iterdir() if p.is_dir() and stage_finished(p))

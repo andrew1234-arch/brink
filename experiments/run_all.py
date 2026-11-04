@@ -17,12 +17,16 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from brink.io import stage_finished
+
 STAGES = ["go_nogo", "gate", "repair", "multilingual", "pipeline"]
 HOURS_T4X2 = {"go_nogo": 4.0, "gate": 1.5, "repair": 2.7, "multilingual": 2.0, "pipeline": 1.5}
 
 
 def done(stage: str, results: Path) -> bool:
-    return (results / stage / "REPORT.md").exists()
+    return stage_finished(results / stage)
 
 
 def run(cmd: list[str]) -> int:

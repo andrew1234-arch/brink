@@ -33,7 +33,7 @@ safetune = ["safetune"]                           # post-hoc baselines (needs Py
 auditkit = ["auditkit"]                           # red-team probes
 # AlignTune: install with `pip install --no-deps aligntune "trl==1.7.1" pypdf python-docx`
 # (its PyICU dependency needs system ICU; see docs/UPSTREAM.md).
-dashboard = ["gradio>=6", "plotly>=5"]
+dashboard = ["gradio==6.31.0", "plotly>=5"]       # same pin as app/requirements.txt (tested)
 dev = ["pytest", "ruff"]
 
 [project.urls]

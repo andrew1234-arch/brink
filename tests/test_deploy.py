@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -12,8 +13,9 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import scripts.deploy_space as deploy_space
 from scripts.build_space import gradio_pin, push, space_readme
-from scripts.deploy_space import DeployError, deploy
+from scripts.deploy_space import DeployError, deploy, deployed_marker
 
 ID = ["-c", "user.name=t", "-c", "user.email=t@t"]
 
@@ -137,8 +139,6 @@ def test_schedule_skips_when_nothing_changed_but_applies_visibility(repo, tmp_pa
     clone, _, _ = repo
     first = FakeApi()
     _run(clone, tmp_path, first)
-    import json
-
     marker = json.loads((tmp_path / "space" / "DEPLOYED.json").read_text())
     api = FakeApi()
     assert _run(clone, tmp_path, api, event="schedule", public=True, marker=marker).startswith("skipped: nothing new")
@@ -162,6 +162,110 @@ def test_gradio_pin_is_single_source():
     assert f"sdk_version: {pin}" in space_readme()
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
     assert "-r app/requirements.txt" in ci  # CI tests the exact pinned version
+    tomllib = pytest.importorskip("tomllib")
+    extras = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["optional-dependencies"]
+    assert f"gradio=={pin}" in extras["dashboard"]  # `pip install .[dashboard]` gets the deployed version
+
+
+def _commit(clone, name):
+    (clone / name).write_text(name)
+    _git(clone, "add", name)
+    _git(clone, "commit", "-q", "-m", name)
+
+
+def test_late_ci_on_an_older_commit_does_not_roll_back(repo, tmp_path):
+    clone, _, _ = repo
+    _commit(clone, "newer.txt")
+    _git(clone, "push", "-q", "origin", "HEAD:main")
+    _git(clone, "checkout", "-q", "HEAD~1")  # CI for the older commit finishes after the newer one was pushed
+    api = FakeApi()
+    status = _run(clone, tmp_path, api)
+    assert status.startswith("skipped:") and "no longer the tip of main" in status
+    assert api.calls == []
+
+
+def test_only_finished_stages_are_published(repo, tmp_path):
+    clone, origin, publish = repo
+    publish(
+        {
+            "results/gate/REPORT.md": "# gate",
+            "results/gate/scores.csv": "id,score\n0,1\n",
+            "results/go_nogo/pos_s0/probe.csv": "step\n0\n",  # failed half-way: no REPORT.md
+        }
+    )
+    assert _run(clone, tmp_path, FakeApi()).startswith("deployed real (1 finished")
+    space = tmp_path / "space" / "results"
+    assert (space / "gate" / "scores.csv").exists()
+    assert not (space / "go_nogo").exists()
+    marker = json.loads((tmp_path / "space" / "DEPLOYED.json").read_text())
+    sha = subprocess.run(["git", "rev-parse", "results/all"], cwd=origin, capture_output=True, text=True)
+    assert marker["stages"] == ["gate"] and marker["results_sha"] == sha.stdout.strip()
+
+
+def test_results_come_only_from_the_results_branch(repo, tmp_path):
+    clone, _, publish = repo
+    local = clone / "results" / "local_run"
+    local.mkdir(parents=True)
+    (local / "REPORT.md").write_text("# not from results/all")
+    assert _run(clone, tmp_path, FakeApi()).startswith("deployed demo")  # no branch: main's results/ ignored
+    publish({"results/gate/REPORT.md": "# gate"})
+    assert _run(clone, tmp_path, FakeApi()).startswith("deployed real")
+    assert sorted(p.name for p in (tmp_path / "space" / "results").iterdir()) == ["gate"]
+    assert sorted(p.name for p in (clone / "results").iterdir()) == ["local_run"]  # checkout left untouched
+
+
+def test_schedule_decides_before_fetching(repo, tmp_path, monkeypatch):
+    clone, _, publish = repo
+    publish({"results/gate/REPORT.md": "# gate"})
+    _run(clone, tmp_path, FakeApi())
+    marker = json.loads((tmp_path / "space" / "DEPLOYED.json").read_text())
+
+    def no_fetch(*a, **k):
+        raise AssertionError("fetched although nothing changed")
+
+    monkeypatch.setattr(deploy_space, "fetch_results", no_fetch)
+    assert _run(clone, tmp_path, FakeApi(), event="schedule", marker=marker).startswith("skipped: nothing new")
+    monkeypatch.undo()
+    publish({"results/gate/REPORT.md": "# gate v2"})
+    assert _run(clone, tmp_path, FakeApi(), event="schedule", marker=marker).startswith("deployed real")
+
+
+def test_marker_reader_distinguishes_missing_from_errors(monkeypatch, capsys):
+    import huggingface_hub
+    from huggingface_hub import errors
+
+    seen = {}
+
+    def fake_download(repo_id, filename, **kw):
+        seen.update(kw)
+        raise exc
+
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", fake_download)
+    monkeypatch.setenv("HF_TOKEN", "hf_env")
+    for name in ("RemoteEntryNotFoundError", "RepositoryNotFoundError"):
+        cls = getattr(errors, name)
+        exc = cls.__new__(cls)
+        assert deployed_marker("me/brink", None) is None
+        assert seen["token"] == "hf_env"  # private Spaces need the token
+        assert "::warning::" not in capsys.readouterr().out
+    exc = errors.LocalEntryNotFoundError("network down")  # a subclass of EntryNotFoundError: not "missing"
+    assert deployed_marker("me/brink", None) is None
+    assert "::warning::" in capsys.readouterr().out
+
+
+def test_missing_token_skips_quietly(monkeypatch, capsys):
+    monkeypatch.setenv("HF_SPACE_ID", "me/brink")
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    assert deploy_space.main() == 0
+    assert "::notice::" in capsys.readouterr().out
+
+
+def test_deploy_workflow_guards():
+    doc = yaml.safe_load((ROOT / ".github" / "workflows" / "deploy-space.yml").read_text())
+    cond = doc["jobs"]["deploy"]["if"]
+    assert "workflow_run.event == 'push'" in cond  # never a fork's pull_request CI run
+    assert "head_repository.full_name == github.repository" in cond
+    assert "workflow_dispatch" in doc["concurrency"]["group"]  # schedule can't replace a queued manual run
 
 
 def test_workflows_do_not_interpolate_into_shell():

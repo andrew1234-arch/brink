@@ -47,13 +47,18 @@ Locally, `python app/app.py --demo-live` shows the same behaviour with a simulat
 
 **Automatic deploy (recommended).** `.github/workflows/deploy-space.yml` runs `scripts/deploy_space.py`:
 
-- **After CI passes on `main`:** deploys exactly the commit CI tested. Untested code is never deployed.
+- **After CI passes on a push to `main`:** deploys exactly the commit CI tested, as long as it is still the
+  tip of `main`, so a slow CI run on an older commit can't roll the Space back. Untested code is never deployed,
+  and CI runs for pull requests (including from forks) never trigger a deploy.
 - **Hourly:** picks up new results from the `results/all` branch. That branch holds only results, so a push
-  to it can't trigger a workflow; the hourly run does nothing if nothing changed.
-- **Manually:** from the Actions tab.
+  to it can't trigger a workflow. If neither the code nor the results changed, the hourly run only re-applies
+  the visibility setting and doesn't fetch or upload anything.
+- **Manually:** from the Actions tab. Manual runs have their own queue, so the hourly run never replaces one.
 
-The Space shows **real runs only** once at least one experiment has finished (a `REPORT.md`). Until then it
-shows the clearly bannered simulated runs, never a mix of the two. If the results branch can't be read, for
+Results come **only** from the `results/all` branch, extracted to a separate folder; anything under `results/`
+on `main` is ignored. The Space publishes **finished experiments only** (those with a `REPORT.md`), so a stage
+that failed half-way never appears. Until at least one experiment has finished it shows the clearly bannered
+simulated runs, never a mix of the two. If the results branch can't be read, for
 example after a network or authentication error, the deploy **fails** rather than falling back to the demo, so
 real results are never replaced by simulated ones. Each deploy mirrors the build exactly and removes anything
 stale. Visibility is applied on every deploy, so changing `HF_SPACE_PUBLIC` takes effect next time.
@@ -66,7 +71,8 @@ One-time setup, in the GitHub repo under **Settings â†’ Secrets and variables â†
 | Variable | `HF_SPACE_ID` | e.g. `your-hf-username/brink` (the Space is created if it doesn't exist) |
 | Variable | `HF_SPACE_PUBLIC` | `true` to make it public; anything else keeps it private |
 
-While `HF_SPACE_ID` is unset, the deploy job is skipped.
+While `HF_SPACE_ID` is unset, the deploy job is skipped. While `HF_TOKEN` is unset, the deploy step is skipped
+with a notice rather than failing.
 
 **By hand:**
 

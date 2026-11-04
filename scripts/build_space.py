@@ -3,9 +3,10 @@
     python scripts/build_space.py --out build/space                      # build only
     python scripts/build_space.py --out build/space --push user/brink    # build and upload (needs HF_TOKEN)
 
-Copies the app, the `brink` package and every run folder under results/ (CSV / JSON / Markdown / PNG only:
-never model replies, tensors or adapters). `--demo` builds with the clearly bannered simulated runs INSTEAD of
-results/: real and simulated runs are never mixed on one Space.
+Copies the app, the `brink` package and every FINISHED experiment under results/ (one with a REPORT.md; CSV /
+JSON / Markdown / PNG only: never model replies, tensors or adapters). Unfinished or failed stages are left out.
+`--demo` builds with the clearly bannered simulated runs INSTEAD of results/: real and simulated runs are never
+mixed on one Space.
 
 The Gradio version comes from the pin in app/requirements.txt: the same file CI installs, so the deployed
 version is the tested one. Automatic deploys from GitHub Actions go through scripts/deploy_space.py.
@@ -16,9 +17,14 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from brink.io import finished_stages
+
 REQUIREMENTS = ROOT / "app" / "requirements.txt"
 ALLOWED = {".csv", ".json", ".md", ".png"}
 SKIP_DIRS = {"adapter", "adapters", "_work", "__pycache__"}
@@ -70,15 +76,22 @@ demo.launch(css=CSS, js="() => { document.body.classList.remove('dark'); }")
 """
 
 
-def copy_results(src: Path, dst: Path) -> int:
+def copy_results(src: Path, dst: Path) -> tuple[int, list[str]]:
+    """Copy the publishable files of every finished stage. Returns (files copied, stages copied)."""
+    stages = finished_stages(src)
     n = 0
-    for f in src.rglob("*"):
-        if f.is_file() and f.suffix in ALLOWED and not (set(f.relative_to(src).parts) & SKIP_DIRS):
-            target = dst / f.relative_to(src)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(f, target)
-            n += 1
-    return n
+    for stage in stages:
+        for f in (src / stage).rglob("*"):
+            rel = f.relative_to(src)
+            if f.is_file() and f.suffix in ALLOWED and not (set(rel.parts) & SKIP_DIRS):
+                target = dst / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, target)
+                n += 1
+    skipped = sorted(p.name for p in src.iterdir() if p.is_dir() and p.name not in stages)
+    if skipped:
+        print(f"left out unfinished stages (no REPORT.md): {', '.join(skipped)}")
+    return n, stages
 
 
 def build(out: Path, results: Path | None, demo: bool) -> Path:
@@ -98,21 +111,26 @@ def build(out: Path, results: Path | None, demo: bool) -> Path:
         simulate_gate(out / "results" / "simulated_gate")
         print(f"built {out} with SIMULATED demo runs only")
         return out
-    n = copy_results(results, out / "results") if results is not None and results.exists() else 0
-    print(f"built {out} ({n} result files)")
+    n, stages = copy_results(results, out / "results") if results is not None and results.is_dir() else (0, [])
+    print(f"built {out} ({n} result files from {len(stages)} finished stage(s))")
     if n == 0:
-        print("warning: no result files found; the Space will show 'No runs found'. Add real runs or pass --demo.")
+        print("warning: no finished runs found; the Space will show 'No runs found'. Add real runs or pass --demo.")
     return out
 
 
+def set_visibility(api, space_id: str, public: bool) -> None:
+    """Applied on every deploy (not only at creation), so changing the setting takes effect next time."""
+    api.update_repo_settings(space_id, private=not public, repo_type="space")
+
+
 def push(out: Path, space_id: str, public: bool, api=None, message: str = "Deploy Brink dashboard") -> None:
-    """Upload `out` so the Space mirrors it exactly, and set visibility on every deploy (not only at creation)."""
+    """Upload `out` so the Space mirrors it exactly, and apply the visibility setting."""
     if api is None:
         from huggingface_hub import HfApi
 
         api = HfApi()
     api.create_repo(space_id, repo_type="space", space_sdk="gradio", private=not public, exist_ok=True)
-    api.update_repo_settings(space_id, private=not public, repo_type="space")
+    set_visibility(api, space_id, public)
     # "*" removes remote files that aren't in this upload (renamed modules, old results); uploaded files are kept.
     api.upload_folder(
         folder_path=str(out), repo_id=space_id, repo_type="space", commit_message=message, delete_patterns=["*"]
@@ -121,9 +139,6 @@ def push(out: Path, space_id: str, public: bool, api=None, message: str = "Deplo
 
 
 def main():
-    import sys
-
-    sys.path.insert(0, str(ROOT))
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "build" / "space"))
     ap.add_argument("--results", default=str(ROOT / "results"))
