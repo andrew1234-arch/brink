@@ -54,9 +54,14 @@ Lead times are measured at the step the alarm is *confirmed*, so they're what a 
 
 ## What we built (all open)
 
-- `brink/`: probe and fingerprint, gate, monitor, repair, evals, analysis, dashboard.
-- 4 experiments with Kaggle notebooks, preflight checks, resumable runs, and an offline CPU test suite.
-- A Gradio monitor dashboard (Hugging Face Space) with a live mode and an adjustable alarm rule.
+- `brink/`: probe and fingerprint, gate, monitor, repair, evals, analysis, dashboard, and `live.py`: the whole
+  product in one call.
+- **A working app (Hugging Face Space).** *Run Brink* runs the full pipeline live on a real model: fingerprint,
+  gate a contaminated fine-tuning set, fine-tune unprotected vs with Brink (alarm, rollback, erosion guard),
+  verify both on held-out prompts, plain-language verdict. *Gate your data* scores any uploaded fine-tuning
+  file and returns a cleaned one. *Experiments* replays every run with an adjustable alarm rule.
+- 4 experiments plus a recorded end-to-end Tiny Aya run, with Kaggle notebooks, preflight checks, resumable
+  runs, and an offline CPU test suite.
 - Upstream feedback for AlignTune, CuratorKIT, SafeTune and AuditKIT ([UPSTREAM.md](UPSTREAM.md)).
 - **Models and data:** Cohere Tiny Aya (`tiny-aya-global`, `tiny-aya-base`) and the Aya red-teaming and
   instruction datasets. Artifacts go on the Hugging Face Hub.
@@ -82,6 +87,13 @@ Lead times are measured at the step the alarm is *confirmed*, so they're what a 
 
 ## Demo Day: 5-minute live demo
 
+**Before going on:** press *Run Brink end to end* on the Space (GPU hardware, Tiny Aya) about 10 minutes
+ahead, so it finishes during the demo. If anything goes wrong, the tab shows the recorded Kaggle run.
+
+0. **(45 s) It works, end to end.** *Run Brink* tab: the six stage cards completing; the unprotected run's
+   refusal signal falling through the alarm line while the Brink run's holds (rollback marked); the verdict
+   and the before / unprotected / with-Brink bars. *Gate your data*: load the example file, score it, the
+   identity-shifting samples rank at the top, download the cleaned file.
 1. **(30 s) The problem.** Fine-tuning breaks safety silently. Show the ASR curve of `pos` from experiment 00:
    flat, then a cliff.
 2. **(60 s) Brink sees it coming.** Dashboard, run 00 `pos`:
@@ -101,15 +113,17 @@ Lead times are measured at the step the alarm is *confirmed*, so they're what a 
 7. **(15 s) Close.** One quantity, J: gate, monitor, repair. Open code, artifacts on the Hub, upstream feedback
    for four Lexsi toolkits.
 
-**Live fallback:** if a live training demo is wanted, run the go/no-go notebook with `LIVE_DASHBOARD = True`
-beforehand and keep the public link open. Otherwise, everything above replays the logged runs.
+Trim steps 3 and 6 if step 0 runs long. Steps 1-6 replay the logged experiment runs (*Experiments* tab).
+Without a GPU Space, step 0 runs on the 0.5B CPU model (start it ~25 minutes ahead) or shows the recorded
+Tiny Aya run; a Kaggle notebook with `--share` also serves the app on a GPU.
 
 ## 2-minute video script
 
 | Time | Shot | Voice-over |
 |---|---|---|
 | 0:00–0:15 | Title, then the ASR cliff | "Fine-tune a safe model and its refusals can quietly collapse. You only find out afterwards." |
-| 0:15–0:45 | Dashboard: signal dropping, alarm, lead span | "Brink watches the model's refusal mechanism itself, in one cheap forward pass, and fires ⟦RESULT⟧ steps before behaviour breaks." |
+| 0:15–0:30 | *Run Brink* tab, sped up: stages completing, verdict | "Here is Brink doing its whole job on Tiny Aya: same data, same model, with and without Brink." |
+| 0:30–0:45 | Signal dropping, alarm, lead span | "Brink watches the model's refusal mechanism itself, in one cheap forward pass, and fires ⟦RESULT⟧ steps before behaviour breaks." |
 | 0:45–1:05 | Gate tab | "The same measure, applied to data before training, finds the samples that cause the damage." |
 | 1:05–1:30 | Repair trade-off plot | "When the alarm fires, Brink rolls back and guards training so it can't erode refusal, keeping task performance. It beats repairing afterwards." |
 | 1:30–1:45 | Multilingual plot | "And it watches every language, because English-only safety checks miss where models break first." |
