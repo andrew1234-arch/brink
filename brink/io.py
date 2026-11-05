@@ -68,3 +68,11 @@ def finished_stages(results: Path | None) -> list[str]:
     if results is None or not Path(results).is_dir():
         return []
     return sorted(p.name for p in Path(results).iterdir() if p.is_dir() and stage_finished(p))
+
+
+def calibrated_threshold(summary_path: Path, signal: str = "S3") -> float | None:
+    """The alarm threshold go / no-go calibrated on its control runs only, or None if it isn't there yet."""
+    try:
+        return float(json.loads(Path(summary_path).read_text())["calibration"][signal]["threshold"])
+    except (FileNotFoundError, KeyError, TypeError, ValueError):
+        return None

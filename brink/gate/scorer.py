@@ -27,7 +27,7 @@ import torch.nn.functional as F
 
 from brink.data import Pair, collate, tokenize_sft
 from brink.probe.fingerprint import SafetyFingerprint
-from brink.probe.signals import _lse_gap
+from brink.probe.signals import lse_gap
 from brink.utils import amp_dtype, batched, format_prompt
 
 # --------------------------------------------------------------------------- LoRA for scoring
@@ -122,7 +122,7 @@ def objective_terms(
             term = 0.0
             if "S3" in w:
                 lp = F.log_softmax(out.logits[:, -1, :].float(), dim=-1)[:, sel]
-                term = term + w["S3"] * _lse_gap(lp, n_ref).sum() / len(hp)
+                term = term + w["S3"] * lse_gap(lp, n_ref).sum() / len(hp)
             if "S1" in w:
                 h = out.hidden_states[fp.layer][:, -1, :].float()
                 term = term + w["S1"] * (h @ r_hat).sum() / len(hp)

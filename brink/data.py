@@ -79,13 +79,13 @@ def _col(ds, candidates: list[str]) -> str:
     raise KeyError(f"None of {candidates} found in columns {ds.column_names}")
 
 
-def _harmful_prompts(src: dict) -> list[str]:
+def load_harmful_prompts(src: dict) -> list[str]:
     ds = _load(src)
     col = src.get("column") or _col(ds, ["prompt", "goal", "behavior", "Behavior", "instruction"])
     return [str(x).strip() for x in ds[col] if str(x).strip()]
 
 
-def _alpaca(src: dict) -> list[Pair]:
+def load_alpaca_pairs(src: dict) -> list[Pair]:
     ds = _load(src)
     ins, inp, out = _col(ds, ["instruction"]), _col(ds, ["input"]), _col(ds, ["output"])
     return [
@@ -93,7 +93,7 @@ def _alpaca(src: dict) -> list[Pair]:
     ]
 
 
-def _harmful_pairs(src: dict) -> tuple[list[Pair], list[Pair]]:
+def load_harmful_pairs(src: dict) -> tuple[list[Pair], list[Pair]]:
     """LLM-LAT/harmful-dataset: prompt, rejected (harmful compliance), chosen (refusal)."""
     ds = _load(src)
     p, bad, good = _col(ds, ["prompt"]), _col(ds, ["rejected"]), _col(ds, ["chosen"])
@@ -102,20 +102,20 @@ def _harmful_pairs(src: dict) -> tuple[list[Pair], list[Pair]]:
     return comply, refuse
 
 
-def _core(cfg: dict, rng: random.Random) -> dict:
+def core_sets(cfg: dict, rng: random.Random) -> dict:
     """Probe / eval prompt sets plus the remaining pools. Shared by every experiment, same RNG order."""
     n_cal, n_probe, n_eval = cfg["n_cal"], cfg["n_probe"], cfg["n_eval"]
     sources = {}
 
     # Harmful probe prompts (AdvBench): calibration + monitoring splits.
-    harmful = _harmful_prompts(cfg["harmful_probe_source"])
+    harmful = load_harmful_prompts(cfg["harmful_probe_source"])
     rng.shuffle(harmful)
     harmful_cal, harmful_probe = harmful[:n_cal], harmful[n_cal : n_cal + n_probe]
     sources["harmful_probe"] = cfg["harmful_probe_source"]["name"]
 
     # Behavioural eval prompts: HarmBench, falling back to unused AdvBench prompts.
     try:
-        ev = _harmful_prompts(cfg["eval_source"])
+        ev = load_harmful_prompts(cfg["eval_source"])
         ev = dedupe_against(ev, harmful_cal + harmful_probe)
         rng.shuffle(ev)
         eval_harmful = ev[:n_eval]
@@ -126,7 +126,7 @@ def _core(cfg: dict, rng: random.Random) -> dict:
         sources["eval"] = cfg["harmful_probe_source"]["name"] + " (held-out)"
 
     # Harmless prompts / benign SFT data (Alpaca, no-input rows).
-    alpaca = _alpaca(cfg["harmless_source"])
+    alpaca = load_alpaca_pairs(cfg["harmless_source"])
     rng.shuffle(alpaca)
     harmless_cal = [u for u, _ in alpaca[:n_cal]]
     harmless_probe = [u for u, _ in alpaca[n_cal : n_cal + n_probe]]
@@ -134,7 +134,7 @@ def _core(cfg: dict, rng: random.Random) -> dict:
     sources["harmless"] = cfg["harmless_source"]["name"]
 
     # Harmful SFT data, de-duplicated against every probe / eval prompt.
-    comply, refuse = _harmful_pairs(cfg["harmful_train_source"])
+    comply, refuse = load_harmful_pairs(cfg["harmful_train_source"])
     refs = harmful_cal + harmful_probe + eval_harmful
     comply = dedupe_against(comply, refs, key=lambda x: x[0])
     refuse = dedupe_against(refuse, refs, key=lambda x: x[0])
@@ -156,7 +156,7 @@ def _core(cfg: dict, rng: random.Random) -> dict:
 
 def build_go_nogo_data(cfg: dict, seed: int) -> GoNoGoData:
     rng = random.Random(seed)
-    c = _core(cfg, rng)
+    c = core_sets(cfg, rng)
     n_train, n_ref = cfg["n_train"], cfg["n_control_refusals"]
     control = c["benign_pool"][: n_train - n_ref] + c["refuse"][:n_ref]
     rng.shuffle(control)
@@ -205,7 +205,7 @@ class GateData:
 
 def build_gate_data(cfg: dict, seed: int) -> GateData:
     rng = random.Random(seed)
-    c = _core(cfg, rng)
+    c = core_sets(cfg, rng)
     n_pool, n_planted, n_anchor, n_held = cfg["n_pool"], cfg["n_planted"], cfg["n_anchor"], cfg["n_heldout"]
     benign = c["benign_pool"]
     held, benign = benign[:n_held], benign[n_held:]
@@ -294,7 +294,7 @@ class RepairData:
 
 def build_repair_data(cfg: dict, seed: int) -> RepairData:
     rng = random.Random(seed)
-    c = _core(cfg, rng)
+    c = core_sets(cfg, rng)
     n_train, n_bad = cfg["n_train"], cfg["n_harmful"]
     benign = c["benign_pool"]
     held = benign[: cfg["n_heldout"]]
@@ -359,7 +359,7 @@ class MultilingualData:
         }
 
 
-def _aya_harmful(src: dict, file: str) -> list[str]:
+def load_aya_harmful(src: dict, file: str) -> list[str]:
     from datasets import load_dataset
 
     ds = load_dataset(src["name"], data_files=file, split="train")
@@ -367,7 +367,7 @@ def _aya_harmful(src: dict, file: str) -> list[str]:
     return [str(x).strip() for x in ds[col] if str(x).strip()]
 
 
-def _aya_harmless(src: dict, languages: list[str]) -> list[str]:
+def load_aya_harmless(src: dict, languages: list[str]) -> list[str]:
     from datasets import load_dataset
 
     ds = load_dataset(src["name"], split=src.get("split", "train"))
@@ -383,15 +383,15 @@ def build_multilingual_data(cfg: dict, seed: int) -> MultilingualData:
     instruction dataset (harmless). Training data stays English: the question is whether safety erodes
     differently in languages the fine-tuning never touched."""
     rng = random.Random(seed)
-    c = _core(cfg, rng)
+    c = core_sets(cfg, rng)
     langs = {
         "en": LangSets(c["harmful_cal"], c["harmless_cal"], c["harmful_probe"], c["harmless_probe"], c["eval_harmful"])
     }
     n_cal, n_probe, n_eval = cfg["ml_n_cal"], cfg["ml_n_probe"], cfg["ml_n_eval"]
     sources = dict(c["sources"])
     for code, lc in cfg["languages"].items():
-        harmful = _aya_harmful(cfg["aya_redteam_source"], lc["redteam_file"])
-        harmless = _aya_harmless(cfg["aya_harmless_source"], lc["aya_dataset_languages"])
+        harmful = load_aya_harmful(cfg["aya_redteam_source"], lc["redteam_file"])
+        harmless = load_aya_harmless(cfg["aya_harmless_source"], lc["aya_dataset_languages"])
         rng.shuffle(harmful)
         rng.shuffle(harmless)
         need = 2 * n_cal + 2 * n_probe + n_eval
@@ -418,7 +418,7 @@ def build_multilingual_data(cfg: dict, seed: int) -> MultilingualData:
 # --------------------------------------------------------------------------- pipeline use case (experiment 04)
 
 
-def _aya_pairs(src: dict, languages: list[str]) -> list[Pair]:
+def load_aya_pairs(src: dict, languages: list[str]) -> list[Pair]:
     """(instruction, answer) pairs from the Aya instruction dataset, filtered by language."""
     from datasets import load_dataset
 
@@ -460,9 +460,9 @@ class PipelineData:
 
 def build_pipeline_data(cfg: dict, seed: int) -> PipelineData:
     rng = random.Random(seed)
-    c = _core(cfg, rng)
+    c = core_sets(cfg, rng)
     uc = cfg["use_case"]
-    pairs = _aya_pairs(cfg["aya_harmless_source"], uc["languages"])
+    pairs = load_aya_pairs(cfg["aya_harmless_source"], uc["languages"])
     rng.shuffle(pairs)
     n_held, n_hev, n_train, n_bad = uc["n_heldout"], uc["n_harmless_eval"], uc["n_train"], uc["n_harmful"]
     if len(pairs) < n_held + n_hev + n_train - n_bad:
@@ -476,7 +476,7 @@ def build_pipeline_data(cfg: dict, seed: int) -> PipelineData:
         {"id": f"p{i}", "user": u, "assistant": a, "source": "planted"} for i, (u, a) in enumerate(c["comply"][:n_bad])
     ]
     rng.shuffle(pool)
-    hi_harm = _aya_harmful(cfg["aya_redteam_source"], uc["redteam_file"])
+    hi_harm = load_aya_harmful(cfg["aya_redteam_source"], uc["redteam_file"])
     rng.shuffle(hi_harm)
     sources = dict(
         c["sources"],

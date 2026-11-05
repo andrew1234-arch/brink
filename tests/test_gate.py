@@ -20,13 +20,13 @@ from brink.data import collate, tokenize_sft
 from brink.gate.scorer import GateScorer, _trainable, drop_mask, objective_terms
 from brink.probe import calibrate
 from brink.utils import load_model_and_tokenizer
-from tests.test_smoke import _data, _tiny_model_dir
+from tests.helpers import synthetic_data, tiny_model_dir
 
 
 @pytest.fixture(scope="module")
 def setup(tmp_path_factory):
-    d = _tiny_model_dir(tmp_path_factory.mktemp("m"))
-    data = _data()
+    d = tiny_model_dir(tmp_path_factory.mktemp("m"))
+    data = synthetic_data()
     model, tok = load_model_and_tokenizer(str(d), torch.device("cpu"))
     fp, base = calibrate(
         model,
@@ -138,8 +138,8 @@ def test_gate_experiment_end_to_end(tmp_path):
     from brink.eval.behavioral import KeywordJudge
     from experiments.gate import run
 
-    d = _tiny_model_dir(tmp_path)
-    g = _data()
+    d = tiny_model_dir(tmp_path)
+    g = synthetic_data()
     pool = [
         {"id": f"b{i}", "user": u, "assistant": a, "source": "benign"}
         for i, (u, a) in enumerate(g.train["control"][:12] * 2)

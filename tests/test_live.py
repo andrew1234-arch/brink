@@ -17,17 +17,17 @@ sys.path.insert(0, str(ROOT))
 from brink.eval.behavioral import KeywordJudge
 from brink.live import STAGES, LiveConfig, LiveData, LiveManager, gate_pairs, read_pairs, read_status, run_live
 from brink.utils import load_model_and_tokenizer
-from tests.test_smoke import _data, _tiny_model_dir
+from tests.helpers import synthetic_data, tiny_model_dir
 
 
 @pytest.fixture(scope="module")
 def tiny(tmp_path_factory):
-    d = _tiny_model_dir(tmp_path_factory.mktemp("m"))
+    d = tiny_model_dir(tmp_path_factory.mktemp("m"))
     return str(d), lambda: load_model_and_tokenizer(str(d), torch.device("cpu"))
 
 
 def _live_data() -> LiveData:
-    g = _data()
+    g = synthetic_data()
     train = g.train["control"][:12] + g.train["pos"][:4]
     return LiveData(
         g.harmful_cal,
@@ -185,17 +185,18 @@ def test_config_is_validated():
 
 def test_public_deployments_only_run_listed_models(monkeypatch):
     import brink.live as live
+    import brink.live.config as live_config
 
     monkeypatch.delenv("BRINK_ALLOW_ANY_MODEL", raising=False)
     monkeypatch.delenv("BRINK_LIVE_MODEL", raising=False)
     monkeypatch.delenv("SPACE_ID", raising=False)
     assert live.allowed_models() is None and live.check_model("any/model") == "any/model"  # local: anything
     monkeypatch.setenv("SPACE_ID", "me/brink")  # on a Hugging Face Space
-    monkeypatch.setattr(live, "has_gpu", lambda: False)
+    monkeypatch.setattr(live_config, "has_gpu", lambda: False)
     assert live.allowed_models() == [live.CPU_MODEL]  # Tiny Aya can't run on a CPU Space
     with pytest.raises(ValueError):
         live.check_model("someone/huge-70b")
-    monkeypatch.setattr(live, "has_gpu", lambda: True)
+    monkeypatch.setattr(live_config, "has_gpu", lambda: True)
     assert live.check_model(live.GPU_MODEL) == live.GPU_MODEL
     monkeypatch.setenv("BRINK_ALLOW_ANY_MODEL", "1")
     assert live.allowed_models() is None
@@ -212,3 +213,13 @@ def test_only_the_owner_can_stop_a_run(tiny, tmp_path):
             break
         time.sleep(0.1)
     assert read_status(run)["state"] == "stopped"
+
+
+def test_alarm_threshold_is_calibrated_only_for_the_calibrated_model(tmp_path):
+    from brink.live import CPU_MODEL, GPU_MODEL, alarm_threshold_for
+
+    summary = tmp_path / "summary.json"
+    assert alarm_threshold_for(GPU_MODEL, summary)[0] == -3.0  # go / no-go hasn't run yet
+    summary.write_text(json.dumps({"calibration": {"S3": {"threshold": -4.5}}}))
+    assert alarm_threshold_for(GPU_MODEL, summary)[0] == -4.5
+    assert alarm_threshold_for(CPU_MODEL, summary)[0] == -3.0  # Tiny Aya's calibration isn't another model's

@@ -34,17 +34,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from brink.analysis.pipeline import analyze
 from brink.data import PipelineData, build_pipeline_data, tokenize_sft
 from brink.io import CsvLog, write_json
-from brink.runner import calibrate_or_load, make_cheap_check, release_gpu
+from brink.runner import calibrate_or_load, loader_from_config, make_cheap_check, release_gpu, resolve_threshold
 from brink.utils import set_seed
 
 GATED = {"brink", "gate_only"}
 POLICY = {"naive": "log", "brink": "rollback_guard", "gate_only": "log", "monitor_only": "rollback_guard"}
-
-
-def _loader(cfg):
-    from experiments.go_nogo import make_loader
-
-    return make_loader(cfg)
 
 
 # --------------------------------------------------------------------------- stage 1: curate + train (GPU 0)
@@ -245,10 +239,8 @@ def train_condition(
 
 
 def train_stage(cfg: dict, out_dir: Path, work: Path, data: PipelineData | None = None, loader=None) -> None:
-    from experiments.repair import resolve_threshold
-
     seed = cfg.get("seed", 0)
-    loader = loader or _loader(cfg)
+    loader = loader or loader_from_config(cfg)
     data = data or build_pipeline_data(cfg["data"], seed)
     write_json(out_dir / "data_summary.json", data.summary())
     fp = calibrate_or_load(out_dir, loader, data, cfg["probe"], seed)
@@ -310,7 +302,7 @@ def eval_stage(cfg: dict, out_dir: Path, work: Path, data: PipelineData | None =
     from brink.eval.behavioral import make_judge
     from brink.repair.posthoc import load_with_adapter
 
-    loader = loader or _loader(cfg)
+    loader = loader or loader_from_config(cfg)
     data = data or build_pipeline_data(cfg["data"], cfg.get("seed", 0))
     judge = judge or make_judge(cfg["judge"])
     ref_path = out_dir / "reference.json"

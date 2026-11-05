@@ -11,3 +11,5 @@
 **/adapter/
 # Working files of the pipeline experiment (curated data, AlignTune outputs, adapters): never committed.
 _work/
+# Live runs started from the app (results/live, recorded by experiments/live.py, IS kept).
+live_runs/

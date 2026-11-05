@@ -27,9 +27,8 @@ from brink.analysis.gate import analyze
 from brink.data import GateData, build_gate_data
 from brink.eval.behavioral import make_judge
 from brink.gate.scorer import GateScorer
-from brink.runner import calibrate_or_load, release_gpu, run_condition
+from brink.runner import calibrate_or_load, loader_from_config, release_gpu, run_condition
 from brink.utils import CsvLog, read_csv, set_seed, write_json, write_jsonl
-from experiments.go_nogo import make_loader
 
 SCORE_PREFIXES = ("grad_", "rep", "random", "classifier")
 
@@ -123,7 +122,7 @@ def run(cfg: dict, out_dir: Path, data: GateData | None = None, loader=None, jud
     out_dir.mkdir(parents=True, exist_ok=True)
     seed = cfg.get("seed", 0)
     set_seed(seed)
-    loader = loader or make_loader(cfg)
+    loader = loader or loader_from_config(cfg)
     write_json(out_dir / "config.json", cfg)
     t_start = time.time()
 

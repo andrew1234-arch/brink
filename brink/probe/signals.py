@@ -61,7 +61,7 @@ def collect(
     return Collected(torch.cat(acts, dim=1), torch.cat(logps, dim=0))
 
 
-def _lse_gap(logp_sel: torch.Tensor, n_refusal: int) -> torch.Tensor:
+def lse_gap(logp_sel: torch.Tensor, n_refusal: int) -> torch.Tensor:
     """Per-prompt log-odds of starting with a refusal token vs a compliance token."""
     return torch.logsumexp(logp_sel[:, :n_refusal], -1) - torch.logsumexp(logp_sel[:, n_refusal:], -1)
 
@@ -99,8 +99,8 @@ def compute_signals(
         "S1": margin[layer].item(),
         "S1h": proj_h[layer].mean().item(),
         "S2": torch.dot(cur, directions[layer]).item(),
-        "S3": _lse_gap(lp_h, n_refusal).mean().item(),
-        "S5": _lse_gap(lp_b, n_refusal).mean().item(),
+        "S3": lse_gap(lp_h, n_refusal).mean().item(),
+        "S5": lse_gap(lp_b, n_refusal).mean().item(),
     }
     for i, m in enumerate(margin.tolist()):
         sig[f"S1_L{i}"] = m

@@ -17,13 +17,13 @@ from brink.monitor.core import Monitor
 from brink.probe import Prober, calibrate
 from brink.repair import ErosionGuard, RepairController
 from brink.utils import load_model_and_tokenizer
-from tests.test_smoke import _data, _tiny_model_dir
+from tests.helpers import synthetic_data, tiny_model_dir
 
 
 @pytest.fixture(scope="module")
 def setup(tmp_path_factory):
-    d = _tiny_model_dir(tmp_path_factory.mktemp("m"))
-    data = _data()
+    d = tiny_model_dir(tmp_path_factory.mktemp("m"))
+    data = synthetic_data()
     model, tok = load_model_and_tokenizer(str(d), torch.device("cpu"))
     fp, _ = calibrate(
         model,

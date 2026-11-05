@@ -19,18 +19,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from brink.eval.behavioral import make_judge
-from brink.live import LiveConfig, run_live
-from experiments.repair import resolve_threshold
+from brink.live import LiveConfig, alarm_threshold_for, run_live
 
 
 def config(path: Path, model: str | None = None) -> tuple[LiveConfig, str]:
     raw = yaml.safe_load(Path(path).read_text())
-    if raw.get("alarm_threshold", "auto") == "auto":
-        raw["alarm_threshold"] = resolve_threshold(
-            {"threshold": "auto", "signal": "S3", "calibration_from": str(ROOT / "results/go_nogo/summary.json")}
-        )
     if model:
         raw["model_id"] = model
+    if raw.get("alarm_threshold", "auto") == "auto":  # Tiny Aya's calibration applies to Tiny Aya only
+        raw["alarm_threshold"], source = alarm_threshold_for(raw["model_id"], ROOT / "results/go_nogo/summary.json")
+        print(f"[alarm] threshold {raw['alarm_threshold']:.2f}: {source}", flush=True)
     return LiveConfig.from_dict(raw), raw.get("judge", "auto")
 
 

@@ -1,4 +1,4 @@
-# Stage "live": Brink end to end on Tiny Aya, recorded so the Space shows a real run (brink/live.py).
+# Stage "live": Brink end to end on Tiny Aya, recorded so the Space shows a real run (brink/live/).
 # fingerprint → gate → fine-tune unprotected vs with Brink → verify. About 15-20 min on a Kaggle T4.
 model_id: CohereLabs/tiny-aya-global
 contamination: 0.25        # share of harmful-compliance samples in the fine-tuning data

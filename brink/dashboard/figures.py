@@ -406,10 +406,18 @@ def fig_live_signals(
         if last:
             _end_label(fig, t, last[0], last[1], label)
     fig.add_hline(y=threshold, line={"color": t["muted"], "width": 1, "dash": "dash"})
+    # Label the threshold at the left edge, above the line: the right edge holds the runs' end labels.
     fig.add_annotation(
-        x=1, xref="paper", y=threshold, xanchor="left", xshift=8, showarrow=False,
-        text=f"alarm z ≤ {threshold:g}", font={"color": t["muted"], "size": 11},
-    )  # fmt: skip
+        x=0,
+        xref="paper",
+        y=threshold,
+        xanchor="left",
+        yanchor="bottom",
+        xshift=4,
+        showarrow=False,
+        text=f"alarm threshold z = {threshold:g}",
+        font={"color": t["muted"], "size": 11},
+    )
     marks = {"alarm": "⚠ alarm", "rollback": "↺ rollback", "halt": "■ halted", "guard_on": "guard on"}
     y = 0.99
     for name, rows in events.items():

@@ -16,7 +16,6 @@ import sys
 import time
 from pathlib import Path
 
-import torch
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -24,15 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from brink.analysis.go_nogo import analyze
 from brink.data import GoNoGoData, build_go_nogo_data
 from brink.eval.behavioral import make_judge
-from brink.runner import calibrate_or_load, run_condition, run_name, seeds_of
-from brink.utils import load_model_and_tokenizer, set_seed, write_json
-
-
-def make_loader(cfg: dict):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    return lambda: load_model_and_tokenizer(
-        cfg["model"]["id"], device, trust_remote_code=cfg["model"].get("trust_remote_code", False)
-    )
+from brink.runner import calibrate_or_load, loader_from_config, run_condition, run_name, seeds_of
+from brink.utils import set_seed, write_json
 
 
 def run(cfg: dict, out_dir: Path, data: GoNoGoData | None = None, loader=None, judge=None) -> dict:
@@ -40,7 +32,7 @@ def run(cfg: dict, out_dir: Path, data: GoNoGoData | None = None, loader=None, j
     out_dir.mkdir(parents=True, exist_ok=True)
     seed = cfg.get("seed", 0)
     set_seed(seed)
-    loader = loader or make_loader(cfg)
+    loader = loader or loader_from_config(cfg)
     write_json(out_dir / "config.json", cfg)
     t_start = time.time()
 

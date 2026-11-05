@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 from brink.data import PipelineData
 from brink.eval.behavioral import KeywordJudge
 from brink.utils import load_model_and_tokenizer
-from tests.test_smoke import _data, _tiny_model_dir
+from tests.helpers import synthetic_data, tiny_model_dir
 
 
 def test_pipeline_end_to_end(tmp_path):
@@ -25,8 +25,8 @@ def test_pipeline_end_to_end(tmp_path):
     pytest.importorskip("aligntune.core.backend_factory")
     from experiments.pipeline import run
 
-    d = _tiny_model_dir(tmp_path)
-    g = _data()
+    d = tiny_model_dir(tmp_path)
+    g = synthetic_data()
     pool = [
         {"id": f"b{i}", "user": u, "assistant": a, "source": "benign"}
         for i, (u, a) in enumerate(g.train["control"][:12])

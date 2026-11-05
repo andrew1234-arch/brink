@@ -131,16 +131,16 @@ def main():
 
     if cfg["data"].get("languages"):
         print("\n[multilingual datasets]  (prints sizes; needs >= ml_n_cal + ml_n_probe + ml_n_eval harmful)")
-        from brink.data import _aya_harmful, _aya_harmless
+        from brink.data import load_aya_harmful, load_aya_harmless
 
         for code, lc in cfg["data"]["languages"].items():
             check(
                 f"{code}: harmful ({cfg['data']['aya_redteam_source']['name']}:{lc['redteam_file']})",
-                lambda lc=lc: f"{len(_aya_harmful(cfg['data']['aya_redteam_source'], lc['redteam_file']))} prompts",
+                lambda lc=lc: f"{len(load_aya_harmful(cfg['data']['aya_redteam_source'], lc['redteam_file']))} prompts",
             )
 
             def _harmless(lc=lc):
-                n = len(_aya_harmless(cfg["data"]["aya_harmless_source"], lc["aya_dataset_languages"]))
+                n = len(load_aya_harmless(cfg["data"]["aya_harmless_source"], lc["aya_dataset_languages"]))
                 if n < cfg["data"]["ml_n_cal"] + cfg["data"]["ml_n_probe"]:
                     raise RuntimeError(
                         f"only {n} harmless prompts; check aya_dataset_languages {lc['aya_dataset_languages']}"
@@ -151,12 +151,12 @@ def main():
 
     if cfg["data"].get("use_case"):
         print("\n[pipeline use case]")
-        from brink.data import _aya_harmful, _aya_pairs
+        from brink.data import load_aya_harmful, load_aya_pairs
 
         uc = cfg["data"]["use_case"]
 
         def _pairs():
-            n = len(_aya_pairs(cfg["data"]["aya_harmless_source"], uc["languages"]))
+            n = len(load_aya_pairs(cfg["data"]["aya_harmless_source"], uc["languages"]))
             need = uc["n_train"] - uc["n_harmful"] + uc["n_heldout"] + uc["n_harmless_eval"]
             if n < need:
                 raise RuntimeError(f"only {n} {uc['languages']} pairs, need {need}; lower use_case.n_train")
@@ -165,7 +165,7 @@ def main():
         check(f"task data ({cfg['data']['aya_harmless_source']['name']}, {uc['languages']})", _pairs)
         check(
             f"Hindi harmful eval ({uc['redteam_file']})",
-            lambda: f"{len(_aya_harmful(cfg['data']['aya_redteam_source'], uc['redteam_file']))} prompts",
+            lambda: f"{len(load_aya_harmful(cfg['data']['aya_redteam_source'], uc['redteam_file']))} prompts",
         )
         check("curatorkit", lambda: __import__("curatorkit").__name__)
 

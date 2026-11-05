@@ -54,7 +54,7 @@ Lead times are measured at the step the alarm is *confirmed*, so they're what a 
 
 ## What we built (all open)
 
-- `brink/`: probe and fingerprint, gate, monitor, repair, evals, analysis, dashboard, and `live.py`: the whole
+- `brink/`: probe and fingerprint, gate, monitor, repair, evals, analysis, dashboard, and `live/`: the whole
   product in one call.
 - **A working app (Hugging Face Space).** *Run Brink* runs the full pipeline live on a real model: fingerprint,
   gate a contaminated fine-tuning set, fine-tune unprotected vs with Brink (alarm, rollback, erosion guard),

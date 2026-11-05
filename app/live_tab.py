@@ -27,6 +27,7 @@ from brink.live import (
     STAGES,
     LiveConfig,
     LiveManager,
+    alarm_threshold_for,
     allowed_models,
     check_model,
     default_model,
@@ -288,7 +289,7 @@ def build_live_tab(results_root: Path, dark: gr.Checkbox) -> LiveManager:
     with gr.Accordion("Gate decisions (every training sample, riskiest first)", open=False):
         t_gate = gr.Dataframe(headers=["rank", "risk score", "actually", "gate"], interactive=False)
     log = gr.Textbox(label="Log", lines=8, max_lines=8, interactive=False, autoscroll=True)
-    timer = gr.Timer(2.0)
+    timer = gr.Timer(2.0)  # 2 s while a run is going, 10 s when idle (to notice someone else's run)
 
     def view(is_dark):
         mode = "dark" if is_dark else "light"
@@ -313,18 +314,22 @@ def build_live_tab(results_root: Path, dark: gr.Checkbox) -> LiveManager:
             gate_rows(run_dir),
             "\n".join((status or {}).get("log", [])[-60:]),
             gr.update(interactive=ML_STACK and not busy, value="Running…" if busy else "Run Brink end to end"),
+            gr.Timer(2.0 if busy else 10.0),
         )
 
     def on_start(model_id, contam, n_steps, drop_frac, pol, request: gr.Request):
         if mgr.running:
             return
         try:
+            model_id = check_model(model_id)
+            threshold, _ = alarm_threshold_for(model_id, Path(results_root) / "go_nogo" / "summary.json")
             cfg = LiveConfig(
-                model_id=check_model(model_id),
+                model_id=model_id,
                 contamination=min(max(float(contam), 0.0), 0.5),
                 max_steps=min(max(int(n_steps), 8), 96),
                 gate_drop_frac=min(max(float(drop_frac), 0.0), 0.5),
                 policy=pol,
+                alarm_threshold=threshold,
             )
         except (TypeError, ValueError) as e:
             raise gr.Error(str(e)) from e
@@ -337,7 +342,7 @@ def build_live_tab(results_root: Path, dark: gr.Checkbox) -> LiveManager:
         if mgr.running and not mgr.stop(getattr(request, "session_hash", None)):
             gr.Info("Only the visitor who started this run can stop it. It ends on its own when it finishes.")
 
-    outputs = [stages, verdict, tiles, p_sig, p_out, t_prompts, t_gate, log, start]
+    outputs = [stages, verdict, tiles, p_sig, p_out, t_prompts, t_gate, log, start, timer]
     start.click(on_start, [model, contamination, steps, drop, policy], None, concurrency_limit=1).then(
         view, dark, outputs
     )
@@ -348,7 +353,8 @@ def build_live_tab(results_root: Path, dark: gr.Checkbox) -> LiveManager:
 
 
 def build_gate_tab(results_root: Path, dark: gr.Checkbox) -> None:
-    cache = Path(os.environ.get("BRINK_CACHE_DIR") or Path(results_root) / "live_runs" / "_fingerprints")
+    # Outside the results folder: a cached fingerprint.json there would show up as a bogus run in Experiments.
+    cache = Path(os.environ.get("BRINK_CACHE_DIR") or Path.home() / ".cache" / "brink" / "fingerprints")
     gpu = has_gpu() if ML_STACK else False
     limit = 1000 if gpu else 200
 

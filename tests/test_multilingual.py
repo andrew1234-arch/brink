@@ -14,14 +14,14 @@ sys.path.insert(0, str(ROOT))
 from brink.data import LangSets, MultilingualData
 from brink.eval.behavioral import KeywordJudge
 from brink.utils import load_model_and_tokenizer
-from tests.test_smoke import _data, _tiny_model_dir
+from tests.helpers import synthetic_data, tiny_model_dir
 
 
 def test_multilingual_end_to_end(tmp_path):
     from experiments.multilingual import run
 
-    d = _tiny_model_dir(tmp_path)
-    g = _data()
+    d = tiny_model_dir(tmp_path)
+    g = synthetic_data()
     base = LangSets(g.harmful_cal, g.harmless_cal, g.harmful_probe, g.harmless_probe, g.eval_harmful)
     rot = LangSets(
         g.harmful_cal[::-1], g.harmless_cal[::-1], g.harmful_probe[::-1], g.harmless_probe[::-1], g.eval_harmful[::-1]

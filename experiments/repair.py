@@ -31,15 +31,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from brink.analysis.repair import analyze
 from brink.data import RepairData, build_repair_data, tokenize_sft
 from brink.eval.audit import redteam as auditkit_redteam
-from brink.eval.behavioral import evaluate_behavior, evaluate_over_refusal, make_judge
-from brink.eval.capability import heldout_loss
+from brink.eval.behavioral import make_judge
 from brink.monitor.core import Monitor
 from brink.probe import Prober
 from brink.repair import ErosionGuard, RepairController
-from brink.runner import calibrate_or_load, release_gpu
+from brink.runner import behaviour_evaluator, calibrate_or_load, loader_from_config, release_gpu, resolve_threshold
 from brink.train_loop import lora_sft
 from brink.utils import CsvLog, set_seed, write_json
-from experiments.go_nogo import make_loader
 
 POLICY_OF = {
     "safety_mix": "log",
@@ -54,37 +52,18 @@ POLICY_OF = {
 
 def make_evaluator(tok, data: RepairData, judge, cfg: dict):
     ec, tc = cfg["eval"], cfg["train"]
-
-    def evaluator(m):
-        metrics, records = evaluate_behavior(m, tok, data.eval_harmful, judge, ec["max_new_tokens"], ec["batch_size"])
-        metrics["over_refusal"] = evaluate_over_refusal(
-            m, tok, data.harmless_eval, judge, ec.get("over_refusal_max_new_tokens", 64), ec["batch_size"]
-        )
-        metrics["heldout_loss"] = heldout_loss(m, tok, data.heldout_benign, tc["max_len"], ec.get("loss_batch_size", 4))
-        return metrics, records
-
-    return evaluator
-
-
-def resolve_threshold(ac: dict) -> float:
-    """`threshold: auto` takes the control-calibrated threshold from the go / no-go summary, so the repair
-    alarm never uses a number tuned on harmful runs."""
-    import json
-
-    t = ac.get("threshold", -3.0)
-    if t != "auto":
-        return float(t)
-    path = Path(ac.get("calibration_from", "results/go_nogo/summary.json"))
-    try:
-        cal = json.loads(path.read_text())["calibration"][ac["signal"]]
-        print(
-            f"[alarm] using control-calibrated threshold {cal['threshold']:.2f} for {ac['signal']} from {path}",
-            flush=True,
-        )
-        return float(cal["threshold"])
-    except (FileNotFoundError, KeyError, json.JSONDecodeError):
-        print(f"[alarm] WARNING: no calibration at {path}; falling back to -3.0. Run go / no-go first.", flush=True)
-        return -3.0
+    return behaviour_evaluator(
+        tok,
+        data.eval_harmful,
+        judge,
+        ec["max_new_tokens"],
+        ec["batch_size"],
+        harmless=data.harmless_eval,
+        heldout=data.heldout_benign,
+        max_len=tc["max_len"],
+        loss_batch_size=ec.get("loss_batch_size", 4),
+        over_refusal_max_new_tokens=ec.get("over_refusal_max_new_tokens", 64),
+    )
 
 
 def final_redteam(model, tok, cdir: Path, cfg: dict) -> None:
@@ -214,7 +193,7 @@ def run(cfg: dict, out_dir: Path, data: RepairData | None = None, loader=None, j
     out_dir.mkdir(parents=True, exist_ok=True)
     seed = cfg.get("seed", 0)
     set_seed(seed)
-    loader = loader or make_loader(cfg)
+    loader = loader or loader_from_config(cfg)
     write_json(out_dir / "config.json", cfg)
     t_start = time.time()
     data = data or build_repair_data(cfg["data"], seed)

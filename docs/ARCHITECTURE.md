@@ -136,7 +136,7 @@ Runs on dense checkpoints (every `M` steps) to build the behavioural curve the m
 
 ### 3.6 `app/`: the product and the dashboard (Gradio, HF Spaces)
 Built: see [DASHBOARD.md](DASHBOARD.md). Three tabs:
-- **Run Brink** runs the whole pipeline live on a real model (`brink/live.py`): fingerprint, gate a
+- **Run Brink** runs the whole pipeline live on a real model (`brink/live/`): fingerprint, gate a
   contaminated fine-tuning set, fine-tune unprotected vs with Brink (alarm + repair), verify both on held-out
   prompts. Tiny Aya on a GPU, a 0.5B model on CPU. `experiments/live.py` records the same run headless.
 - **Gate your data** scores an uploaded fine-tuning file and returns the ranked samples and a cleaned file.
@@ -213,9 +213,9 @@ brink/
 │   ├── eval/               # behavioural ASR (WildGuard / keyword), capability, AuditKIT red-team
 │   ├── analysis/           # one module per experiment: verdicts, reports, plots
 │   ├── dashboard/          # run loading, live metrics, Plotly figures (no ML dependencies)
-│   ├── live.py             # Brink end to end in one call: the "Run Brink" tab and experiments/live.py
+│   ├── live/               # Brink end to end in one call: config, data, status, pipeline, manager, upload
 │   ├── data.py             # datasets and disjoint splits for every experiment
-│   ├── runner.py           # shared calibration and monitored-run plumbing
+│   ├── runner.py           # shared plumbing: loaders, calibrated threshold, evaluator, monitored runs
 │   └── train_loop.py       # LoRA SFT loop with controller hooks
 ├── experiments/            # entry points: preflight, go_nogo, gate, repair, multilingual, pipeline, live, run_all
 ├── configs/                # one YAML per experiment

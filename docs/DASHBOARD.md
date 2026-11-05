@@ -14,7 +14,7 @@ pip install -e ".[dashboard]"                # the app with the training stack (
 
 ## Run Brink: end to end, live
 
-One click runs, on a real model, in this order (`brink/live.py`):
+One click runs, on a real model, in this order (`brink/live/`):
 
 1. **Load data:** a contaminated fine-tuning set (benign task samples plus a chosen share of harmful-compliance
    samples), held-out harmful and harmless prompts, and held-out task data.

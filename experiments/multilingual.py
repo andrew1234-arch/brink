@@ -25,10 +25,9 @@ from brink.data import MultilingualData, build_multilingual_data, tokenize_sft
 from brink.eval.behavioral import evaluate_behavior, make_judge
 from brink.monitor.core import Monitor
 from brink.probe.multilingual import MultiProber, calibrate_languages
-from brink.runner import release_gpu
+from brink.runner import loader_from_config, release_gpu
 from brink.train_loop import lora_sft
 from brink.utils import CsvLog, set_seed, write_json
-from experiments.go_nogo import make_loader
 
 
 def make_evaluator(tok, data: MultilingualData, judge, ec: dict):
@@ -57,7 +56,7 @@ def run(cfg: dict, out_dir: Path, data: MultilingualData | None = None, loader=N
     out_dir.mkdir(parents=True, exist_ok=True)
     seed = cfg.get("seed", 0)
     set_seed(seed)
-    loader = loader or make_loader(cfg)
+    loader = loader or loader_from_config(cfg)
     write_json(out_dir / "config.json", cfg)
     t_start = time.time()
     data = data or build_multilingual_data(cfg["data"], seed)

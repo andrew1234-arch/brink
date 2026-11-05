@@ -17,13 +17,13 @@ from brink.monitor.core import Monitor
 from brink.probe import Prober, calibrate
 from brink.repair import ErosionGuard, RepairController, SnapshotBuffer
 from brink.utils import load_model_and_tokenizer
-from tests.test_smoke import _data, _tiny_model_dir
+from tests.helpers import synthetic_data, tiny_model_dir
 
 
 @pytest.fixture(scope="module")
 def setup(tmp_path_factory):
-    d = _tiny_model_dir(tmp_path_factory.mktemp("m"))
-    data = _data()
+    d = tiny_model_dir(tmp_path_factory.mktemp("m"))
+    data = synthetic_data()
     model, tok = load_model_and_tokenizer(str(d), torch.device("cpu"))
     fp, base = calibrate(
         model,
@@ -242,7 +242,7 @@ def test_repair_experiment_end_to_end(tmp_path):
     from brink.eval.behavioral import KeywordJudge
     from experiments.repair import run
 
-    d = _tiny_model_dir(tmp_path)
+    d = tiny_model_dir(tmp_path)
     base_dir = tmp_path / "tiny_base"  # stand-in "pre-alignment" base for ReSta
     base = AutoModelForCausalLM.from_pretrained(str(d))
     torch.manual_seed(3)
@@ -251,7 +251,7 @@ def test_repair_experiment_end_to_end(tmp_path):
             p.add_(0.01 * torch.randn_like(p))
     base.save_pretrained(base_dir)
 
-    g = _data()
+    g = synthetic_data()
     data = RepairData(
         g.harmful_cal,
         g.harmless_cal,
