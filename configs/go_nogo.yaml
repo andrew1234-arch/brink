@@ -1,6 +1,6 @@
-# Experiment 00: go / no-go. 2 conditions x 3 seeds: about 4 h on Kaggle "GPU T4 x2" (resumable).
+# Experiment 00: go / no-go. 2 conditions x 2 seeds: about 2.7 h on Kaggle "GPU T4 x2" (resumable).
 seed: 0
-seeds: [0, 1, 2]            # every condition runs under each seed (LoRA init + data order)
+seeds: [0, 1]               # every condition runs under each seed (LoRA init + data order)
 
 model:
   id: CohereLabs/tiny-aya-global      # gated: accept the licence on its Hugging Face page first

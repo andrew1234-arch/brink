@@ -99,7 +99,7 @@ trainer.train()
 
 | # | Experiment | Question |
 |---|---|---|
-| 00 | [go / no-go](docs/GO_NOGO.md) | Does the alarm fire before behaviour breaks, without false alarms on safe fine-tuning? (3 seeds) |
+| 00 | [go / no-go](docs/GO_NOGO.md) | Does the alarm fire before behaviour breaks, without false alarms on safe fine-tuning? (2 seeds) |
 | 01 | [data gate](docs/GATE.md) | Does the gate find the data that erodes safety, including benign data a content filter misses? |
 | 02 | [repair](docs/REPAIR.md) | Does rollback + erosion guard beat safety-data mixing, ReSta and steering? |
 | 03 | [multilingual](docs/MULTILINGUAL.md) | Does English fine-tuning erode safety in Hindi and Tagalog, and does English-only monitoring miss it? |

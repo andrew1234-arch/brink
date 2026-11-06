@@ -44,7 +44,7 @@ calibrated against the model before fine-tuning (its *fingerprint*).
 
 | Claim | Experiment | Result |
 |---|---|---|
-| The alarm fires before behaviour breaks, without false alarms on safe fine-tuning | 00 go / no-go, 3 seeds | lead ⟦RESULT⟧ ± ⟦RESULT⟧ steps (mechanistic signal ⟦RESULT⟧ vs proxy S3 ⟦RESULT⟧); leave-one-seed-out false alarms ⟦RESULT⟧; vs cheap judge: lead ⟦RESULT⟧, cost ⟦RESULT⟧× |
+| The alarm fires before behaviour breaks, without false alarms on safe fine-tuning | 00 go / no-go, 2 seeds | lead ⟦RESULT⟧ ± ⟦RESULT⟧ steps (mechanistic signal ⟦RESULT⟧ vs proxy S3 ⟦RESULT⟧); leave-one-seed-out false alarms ⟦RESULT⟧; vs cheap judge: lead ⟦RESULT⟧, cost ⟦RESULT⟧× |
 | The gate finds risk a content filter can't | 01 gate | AUROC gate ⟦RESULT⟧ vs WildGuard ⟦RESULT⟧; classifier flags ⟦RESULT⟧ of the gate's top benign subset; ASR top / random / bottom ⟦RESULT⟧ |
 | Repairing in training beats the standard fixes | 02 repair | ASR none ⟦RESULT⟧ → rollback + guard ⟦RESULT⟧ at task loss ⟦RESULT⟧; safety-mix ⟦RESULT⟧, ReSta ⟦RESULT⟧, steering ⟦RESULT⟧ |
 | Safety erodes across languages; English-only monitoring lags | 03 multilingual | first language to break ⟦RESULT⟧; English-only vs worst-language lead ⟦RESULT⟧ |

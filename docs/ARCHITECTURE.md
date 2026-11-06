@@ -124,7 +124,7 @@ Runs on dense checkpoints (every `M` steps) to build the behavioural curve the m
   (jailbreak, injection, encoding), per language.
 - **Over-refusal:** AuditKIT over-refusal probes. A safe-but-useless model is a failure.
 - **Capability:** the fine-tuning task's own metric plus a small lm-eval subset.
-- **Stats:** bootstrap CIs and significance tests via AuditKIT; 3 seeds per condition.
+- **Stats:** bootstrap CIs and significance tests via AuditKIT; 2 seeds per condition in go / no-go (sized to the GPU quota).
 
 ### 3.5 `brink.analysis`
 - **Lead time:** `t_behav` = first checkpoint where ASR > base + δ (CI excludes base); `t_alarm` = first
