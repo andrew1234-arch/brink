@@ -191,10 +191,33 @@ def tiles_html(run_dir: Path | None, summary: dict | None) -> str:
         _tile(
             "Gate: harmful samples caught",
             "—" if not g else f"{g['harmful_caught']} / {g['harmful_total']}",
-            "" if not g else f"precision {g['precision']:.0%} vs {g['random_precision']:.0%} by chance",
+            ""
+            if not g
+            else f"precision {g['precision']:.0%} vs {g['random_precision']:.0%} by chance"
+            + (" · CuratorKIT pipeline" if str(g.get("engine", "")).startswith("CuratorKIT") else ""),
         ),
         _tile("Task loss: unprotected → Brink", f"{loss('unprotected')} → {loss('brink')}", "held-out task data"),
     ]
+    chrf = lambda k: (  # noqa: E731
+        "—" if not o[k] or o[k].get("task_chrf") is None else f"{o[k]['task_chrf']:.1f}"
+    )
+    if any(o[k] and o[k].get("task_chrf") is not None for k in o):
+        tiles.append(
+            _tile(
+                "Task quality (chrF): unprotected → Brink",
+                f"{chrf('unprotected')} → {chrf('brink')}",
+                "higher is better",
+            )
+        )
+    rt = lambda k: ((summary or {}).get(k) or {}).get("redteam_attack_resistance")  # noqa: E731
+    if any(rt(k) is not None for k in ("before", "unprotected", "brink")):
+        tiles.append(
+            _tile(
+                "AuditKIT red team: attacks resisted",
+                f"{_pct(rt('unprotected'))} → {_pct(rt('brink'))}",
+                f"unprotected → Brink; {_pct(rt('before'))} before fine-tuning",
+            )
+        )
     return _root('<div class="brink-tiles">' + "".join(tiles) + "</div>")
 
 
@@ -405,16 +428,19 @@ def build_gate_tab(results_root: Path, dark: gr.Checkbox) -> None:
                 if r["decision"] == "keep":
                     f.write(json.dumps({"prompt": r["prompt"], "response": r["response"]}, ensure_ascii=False) + "\n")
         dropped = [r for r in rows if r["decision"] == "drop"]
+        dups = sum(r["decision"] == "drop (duplicate)" for r in rows)
         eroding = sum(1 for r in rows if (r["risk"] or 0) > 0)
         msg = (
-            f"Scored <b>{len(rows)}</b> samples on <code>{html.escape(model_id)}</code>. "
-            f"<b>{eroding}</b> would erode refusal (risk above 0). Dropping the riskiest <b>{len(dropped)}</b>; "
-            f"the cleaned file keeps {sum(r['decision'] == 'keep' for r in rows)}."
+            f"Scored <b>{len(rows)}</b> samples on <code>{html.escape(model_id)}</code> with a CuratorKIT pipeline "
+            f"(ExactDeduplicator → BrinkSafetyGate). <b>{eroding}</b> would erode refusal (risk above 0). "
+            f"Dropping the riskiest <b>{len(dropped)}</b>"
+            + (f" and {dups} exact duplicate{'s' if dups != 1 else ''}" if dups else "")
+            + f"; the cleaned file keeps {sum(r['decision'] == 'keep' for r in rows)}."
         )
         short = lambda s: s if len(s) <= 240 else s[:237] + "…"  # noqa: E731
         return (
             _root(f'<div class="brink-verdict">{msg}</div>'),
-            F.fig_upload_scores([r["risk"] for r in rows], [r["decision"] == "drop" for r in rows],
+            F.fig_upload_scores([r["risk"] for r in rows], [r["decision"].startswith("drop") for r in rows],
                                 "dark" if is_dark else "light"),
             [[r["rank"], r["risk"], r["decision"], short(r["prompt"]), short(r["response"])] for r in rows],
             [str(out / "scored.csv"), str(out / "cleaned.jsonl")],

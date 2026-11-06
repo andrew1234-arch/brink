@@ -62,7 +62,7 @@ Lead times are measured at the step the alarm is *confirmed*, so they're what a 
   file and returns a cleaned one. *Experiments* replays every run with an adjustable alarm rule.
 - 4 experiments plus a recorded end-to-end Tiny Aya run, with Kaggle notebooks, preflight checks, resumable
   runs, and an offline CPU test suite.
-- Upstream feedback for AlignTune, CuratorKIT, SafeTune and AuditKIT ([UPSTREAM.md](UPSTREAM.md)).
+- Upstream feedback for AlignTune, CuratorKIT, SafeTune, AuditKIT and CircuitKIT ([UPSTREAM.md](UPSTREAM.md)).
 - **Models and data:** Cohere Tiny Aya (`tiny-aya-global`, `tiny-aya-base`) and the Aya red-teaming and
   instruction datasets. Artifacts go on the Hugging Face Hub.
 
@@ -111,7 +111,7 @@ ahead, so it finishes during the demo. If anything goes wrong, the tab shows the
 6. **(30 s) Beyond English.** Run 03: which language breaks first, and how much earlier the worst-language
    alarm fires.
 7. **(15 s) Close.** One quantity, J: gate, monitor, repair. Open code, artifacts on the Hub, upstream feedback
-   for four Lexsi toolkits.
+   for five Lexsi toolkits.
 
 Trim steps 3 and 6 if step 0 runs long. Steps 1-6 replay the logged experiment runs (*Experiments* tab).
 Without a GPU Space, step 0 runs on the 0.5B CPU model (start it ~25 minutes ahead) or shows the recorded

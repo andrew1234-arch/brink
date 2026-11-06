@@ -94,6 +94,11 @@ def copy_results(src: Path, dst: Path) -> tuple[int, list[str]]:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, target)
                 n += 1
+    for name in ("ROI.md", "roi.json"):  # the ROI comparison lives at the top of results/
+        if (src / name).is_file():
+            dst.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src / name, dst / name)
+            n += 1
     skipped = sorted(p.name for p in src.iterdir() if p.is_dir() and p.name not in stages)
     if skipped:
         print(f"left out unfinished stages (no REPORT.md): {', '.join(skipped)}")

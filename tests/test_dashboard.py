@@ -127,3 +127,17 @@ def test_multi_seed_runs(tmp_path):
     names = ["control_s0", "control_s1", "pos_s0", "pos_s1"]
     assert _cond_color(t, names, "pos_s0") == _cond_color(t, names, "pos_s1") == t["series"][0]
     assert _cond_color(t, names, "control_s1") == t["series"][1]
+
+
+def test_stage_reports_in_programme_order(tmp_path):
+    from brink.dashboard.runs import stage_reports
+
+    for name in ("circuit", "go_nogo", "unfinished"):
+        (tmp_path / name).mkdir()
+    (tmp_path / "circuit" / "REPORT.md").write_text("# circuit report")
+    (tmp_path / "go_nogo" / "REPORT.md").write_text("# go report")
+    (tmp_path / "ROI.md").write_text("# ROI")
+    md = stage_reports(tmp_path)
+    assert md.index("go report") < md.index("circuit report") < md.index("# ROI")
+    assert "unfinished" not in md
+    assert stage_reports(tmp_path / "missing") == "No results yet."

@@ -78,6 +78,14 @@ def test_run_live_end_to_end(tiny, tmp_path):
     assert g["dropped"] == 4 and g["harmful_total"] == 4 and 0 <= g["harmful_caught"] <= 4
     assert s["brink"]["n_train"] == 12  # trained on the gated data
     assert s["brink"]["policy"] == "rollback_guard" and s["brink"]["rolled_back_to"] == 0
+    # Lexsi toolkits in the live product: CuratorKIT gates, AuditKIT red-teams all three models.
+    assert g["engine"].startswith("CuratorKIT") and s["lexsi_toolkits"]["CuratorKIT"]
+    assert s["lexsi_toolkits"]["AuditKIT"]
+    for k in ("before", "unprotected", "brink"):
+        assert 0 <= s[k]["redteam_attack_resistance"] <= 1
+        assert 0 <= s[k]["task_chrf"] <= 100
+    report = (out / "REPORT.md").read_text()
+    assert "AuditKIT" in report and "chrF" in report and "CuratorKIT" in report
     assert s["unprotected"]["alarm_step"] is not None and s["brink"]["guard"]["steps"] > 0
     for k in ("before", "unprotected", "brink"):
         assert 0 <= s[k]["refusal_rate"] <= 1 and s[k]["heldout_loss"] > 0
@@ -160,7 +168,11 @@ def test_gate_your_data(tiny, tmp_path):
     )
     assert seen[0] == 0.0 and seen[-1] == 1.0 and seen == sorted(seen)  # drives the progress bar
     assert [r["rank"] for r in rows] == list(range(1, 9))
-    assert sum(r["decision"] == "drop" for r in rows) == 2
+    # CuratorKIT dedups first (5 copies of the poem, 1 of the harmful pair), then the gate drops the riskiest
+    # 25 % of the whole file by a threshold over all 8 scores. Which pair is riskier is up to the random model.
+    decisions = [r["decision"] for r in rows]
+    assert decisions.count("drop (duplicate)") == 6
+    assert decisions.count("keep") + decisions.count("drop") == 2
     assert rows[0]["risk"] >= rows[-1]["risk"]
     assert list((tmp_path / "cache").rglob("fingerprint.json"))  # calibrated once, then cached
 
@@ -223,3 +235,15 @@ def test_alarm_threshold_is_calibrated_only_for_the_calibrated_model(tmp_path):
     summary.write_text(json.dumps({"calibration": {"S3": {"threshold": -4.5}}}))
     assert alarm_threshold_for(GPU_MODEL, summary)[0] == -4.5
     assert alarm_threshold_for(CPU_MODEL, summary)[0] == -3.0  # Tiny Aya's calibration isn't another model's
+
+
+def test_curatorkit_gate_dedups_then_drops_the_riskiest():
+    import numpy as np
+
+    from brink.live.pipeline import gate_with_curatorkit
+
+    pairs = [("a", "1"), ("b", "2"), ("a", "1"), ("c", "3"), ("d", "4")]
+    scores = np.array([0.1, 0.9, 0.1, 0.2, 0.3])
+    drop, dups, engine = gate_with_curatorkit(pairs, scores, 0.25)
+    assert engine.startswith("CuratorKIT") and dups.tolist() == [False, False, True, False, False]
+    assert drop.tolist() == [False, True, True, False, False]  # the duplicate and the top-scored sample

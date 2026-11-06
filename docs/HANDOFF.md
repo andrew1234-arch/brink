@@ -118,7 +118,18 @@ Gotchas:
 | HF Space | **Not deployed.** `HF_SPACE_ID` isn't set, so the deploy job is skipped |
 | Write-up numbers | 7 `⟦RESULT⟧` markers in `docs/SUBMISSION.md`; README says "Results: pending" |
 
+| Rubric scorecard | `docs/SCORECARD.md`: requirements and problem statements from hackathon.lexsi.ai, scored. **Re-score it at each milestone and on Nov 13** |
+| Branch `rubric-gaps` (local, 2026-11-06) | Closes scorecard gaps: CuratorKIT + AuditKIT inside *Run Brink* and *Gate your data*; chrF task-quality metric; CircuitKIT stage (`circuit`, last in the notebook); ROI calculator; public dataset repo + HF collection in `publish_hub.py`; `docs/ABSTRACT.md`, `docs/ARTICLE.md`, `docs/CIRCUIT.md`. Not merged: the Kaggle notebook clones `main` |
+
 **Critical path:** run the experiments → check and fix → fill in the numbers → deploy → submit by Nov 14.
+
+**Rules that change the plan** (hackathon.lexsi.ai, read 2026-11-06):
+- Projects "must be deployed publicly". All models, adapters, logs and datasets must be in a public, un-gated HF
+  collection.
+- The write-up is an HF Article (`docs/ARTICLE.md`), plus an abstract under 500 words (`docs/ABSTRACT.md`).
+- Only Track 2 repos count toward the "chain at least 2 repos from your track" rule (CuratorKIT, SafeTune,
+  CircuitKIT, AuditKIT). AlignTune is a Track 1 repo.
+- There are 5 prizes overall, across all tracks.
 
 ## 7. What's left, step by step
 
@@ -151,6 +162,10 @@ back to the keyword judge.
 For each stage, read `results/<stage>/REPORT.md` and `summary.json` on the `results/all` branch. Pass
 criteria are in each experiment doc: `docs/GO_NOGO.md` ("Pass criteria (all must hold for GO)"),
 `docs/GATE.md`, `docs/REPAIR.md`, `docs/MULTILINGUAL.md` and `docs/PIPELINE.md`.
+- **AuditKIT numbers from runs on the old `main` are wrong.** Before branch `rubric-gaps`, `brink/eval/audit.py` used
+  AuditKIT's default detectors, which score a refusal as a failed attack: a model that refuses everything got
+  0 % attack resistance. Don't quote `redteam_*` / "AuditKIT attacks resisted" from any stage that ran on the old
+  code (repair in session 1). WildGuard ASR is unaffected. See `docs/UPSTREAM.md`.
 - If go/no-go says NO-GO, don't hide it. Read the report's failing criterion and decide whether it's a bug, a
   sizing issue (steps, learning rate, contamination) or a real negative result. The write-up states
   limitations up front.
@@ -167,6 +182,9 @@ criteria are in each experiment doc: `docs/GO_NOGO.md` ("Pass criteria (all must
 
 ### Step 3: fill in the numbers
 
+- Run `python scripts/headlines.py --fill docs/ABSTRACT.md`. It writes `results/HEADLINES.md` (every headline number
+  with its source file and key) and fills the abstract's named markers, listing any it can't fill. Copy numbers
+  into the other docs from `HEADLINES.md`.
 - `docs/SUBMISSION.md`: replace every `⟦RESULT⟧` (lines ~47-51 and the video script, ~line 126) with numbers
   from the `summary.json` files. Every number must trace back to a file in `results/`.
 - `README.md`: replace "**Results:** pending the GPU runs…" (~line 116) with a short results table: before
@@ -206,12 +224,20 @@ python scripts/publish_hub.py --repo <hf-username>/brink-artifacts              
 ```
 
 ```bash
-python scripts/publish_hub.py --repo <hf-username>/brink-artifacts --yes --adapters rollback_guard
+python scripts/publish_hub.py --repo <hf-username>/brink-artifacts --dataset-repo <hf-username>/brink-results \
+    --space <hf-username>/brink --collection "Brink" --yes --adapters rollback_guard brink
 ```
+
+The hackathon requires the collection and every repo in it to be public, so don't pass `--private`.
 
 This publishes fingerprints, summaries, reports, plots and CSV logs, plus Brink-protected adapters by name.
 It refuses drifted adapters and replies. Adapters exist only on the machine that trained them, so on Kaggle
 run this at the end of the session, or the adapters are lost when it ends.
+
+### Step 5b: ROI
+
+Fill in the prices in `configs/roi.yaml`, each with its source and date, then run `python scripts/roi.py`. It
+reads the serving speed measured in stage 04 and writes `results/ROI.md`.
 
 ### Step 6: submit (by Nov 14)
 

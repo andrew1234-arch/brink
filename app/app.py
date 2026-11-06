@@ -38,7 +38,7 @@ from live_tab import LIVE_CSS, build_gate_tab, build_live_tab
 
 from brink.dashboard import figures as F
 from brink.dashboard.metrics import AlarmRule, alarm_step, behaviour_break, kpis, rule_from_run, status
-from brink.dashboard.runs import Run, discover_runs, load_run
+from brink.dashboard.runs import Run, discover_runs, load_run, stage_reports
 
 CSS = """
 .brink-root { --b-surface:#fcfcfb; --b-ink:#0b0b0b; --b-ink2:#52514e; --b-muted:#898781;
@@ -316,6 +316,8 @@ def experiments_tab(results_root: Path, label_root: Path, dark: gr.Checkbox) -> 
             t_eval = gr.Dataframe(
                 headers=EVAL_HEADERS, label="Behavioural evals, selected condition", interactive=False
             )
+        with gr.Tab("Reports"):
+            gr.Markdown(stage_reports(results_root))  # every stage's verdict, incl. CircuitKIT and ROI
     timer = gr.Timer(5, active=False)
 
     inputs = [run_dd, cond_dd, signal, method, thr, persist, dark]

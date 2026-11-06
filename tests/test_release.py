@@ -37,6 +37,15 @@ def test_space_build_excludes_sensitive_files(tmp_path):
     assert "sdk: gradio" in (out / "README.md").read_text()
 
 
+def test_space_build_includes_the_roi(tmp_path):
+    from scripts.build_space import build
+
+    r = _fake_results(tmp_path)
+    (r / "ROI.md").write_text("# ROI")
+    out = build(tmp_path / "space", r, demo=False)
+    assert (out / "results" / "ROI.md").exists()
+
+
 def test_space_demo_build_never_mixes_in_real_runs(tmp_path):
     from scripts.build_space import build
 
@@ -88,3 +97,19 @@ def test_pipeline_layout_and_work_dir(tmp_path):
     assert any("adapters/brink/" in f for f in files)
     assert not any("/naive/" in f for f in files)  # the unprotected pipeline model stays private
     assert not any(f.endswith(("raw.jsonl", "manifest.json")) for f in files)
+
+
+def test_split_release_keeps_adapters_out_of_the_dataset(tmp_path):
+    from scripts.publish_hub import collect, split_release
+
+    stage = tmp_path / "stage"
+    collect(_fake_results(tmp_path), stage, ["rollback_guard"])
+    model, data = split_release(stage)
+    model_files = {str(p.relative_to(model)) for p in model.rglob("*") if p.is_file()}
+    data_files = {str(p.relative_to(data)) for p in data.rglob("*") if p.is_file()}
+    assert "fingerprints/repair/fingerprint.pt" in model_files
+    assert any(f.startswith("adapters/repair/rollback_guard/") for f in model_files)
+    assert "results/repair/REPORT.md" in data_files
+    assert not any(f.startswith(("adapters/", "fingerprints/")) for f in data_files)
+    assert not any(f.endswith("generations.jsonl") for f in model_files | data_files)
+    assert "pretty_name" in (data / "README.md").read_text()

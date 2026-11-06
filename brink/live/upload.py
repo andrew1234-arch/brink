@@ -98,7 +98,8 @@ def gate_pairs(
     import numpy as np
 
     from brink.data import tokenize_sft
-    from brink.gate.scorer import GateScorer, drop_mask
+    from brink.gate.scorer import GateScorer
+    from brink.live.pipeline import gate_with_curatorkit
     from brink.runner import release_gpu
 
     loader = loader or _loader(model_id)
@@ -115,13 +116,15 @@ def gate_pairs(
     del scorer, model
     release_gpu()
     filled = np.where(np.isnan(scores), -np.inf, scores)
-    drop = drop_mask(filled, drop_frac)
+    drop, dup, _ = gate_with_curatorkit(pairs, filled, drop_frac)  # CuratorKIT: dedup → BrinkSafetyGate
     order = np.argsort(-filled, kind="stable")
     return [
         {
             "rank": r,
             "risk": None if np.isnan(scores[i]) else round(float(scores[i]), 4),
-            "decision": "drop" if drop[i] else ("skipped (too long)" if np.isnan(scores[i]) else "keep"),
+            "decision": "drop (duplicate)"
+            if dup[i]
+            else ("drop" if drop[i] else ("skipped (too long)" if np.isnan(scores[i]) else "keep")),
             "prompt": pairs[i][0],
             "response": pairs[i][1],
         }

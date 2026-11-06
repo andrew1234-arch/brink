@@ -2,10 +2,16 @@
 
     data → fingerprint → gate the training data → fine-tune UNPROTECTED → fine-tune WITH BRINK → verify
 
+Lexsi toolkits in the loop (each used when installed, with Brink's own code as the fallback):
+    CuratorKIT  the gate runs as a CuratorKIT pipeline: ExactDeduplicator → BrinkSafetyGate
+    AuditKIT    red-team probes (jailbreak, encoding, prompt injection, benign) on the base model and both
+                fine-tuned models
+
 Both fine-tunes start from the same model and see the same contaminated data (benign task samples plus a share
 of harmful-compliance samples). The unprotected run trains on all of it with the monitor watching only; the
 Brink run trains on the gated data with the alarm and repair policy armed. Verification measures both final
-models on held-out harmful prompts (refusal), harmless prompts (over-refusal) and held-out task data (loss).
+models on held-out harmful prompts (refusal), harmless prompts (over-refusal) and held-out task data (loss and
+reply quality as chrF).
 
 Used by the dashboard's "Run Brink" tab (in a background thread, followed live in the browser) and by
 `experiments/live.py` (headless, e.g. on Kaggle, so the Space can also show a recorded Tiny Aya run).
@@ -49,6 +55,59 @@ class _Stoppable:
         return self.ctl.on_step(model, step)
 
 
+# --------------------------------------------------------------------------- Lexsi toolkits
+
+
+def _redteam(model, tok, cfg, st, name, judge=None) -> dict | None:
+    """AuditKIT red-team probes on one model. None when switched off or AuditKIT isn't installed."""
+    from brink.eval.audit import redteam
+
+    if not cfg.redteam:
+        return None
+    try:
+        r = redteam(model, tok, max_new_tokens=cfg.max_new_tokens, batch_size=cfg.batch_size, judge=judge)
+    except ImportError:
+        st.log("AuditKIT is not installed: red-team probes skipped")
+        return None
+    st.log(f"{name}: AuditKIT red team, attacks resisted {_pct(r.get('redteam_attack_resistance'))}")
+    return r
+
+
+def gate_with_curatorkit(pairs, scores, drop_frac: float):
+    """Gate through a CuratorKIT pipeline (ExactDeduplicator → BrinkSafetyGate) using precomputed Brink scores.
+    Returns (drop mask over `pairs`, duplicate mask (the dropped exact duplicates), engine name). Falls back to
+    Brink's own drop rule when CuratorKIT isn't installed."""
+    import numpy as np
+
+    from brink.gate.scorer import drop_mask
+
+    try:
+        from curatorkit.normalizers.dedup import ExactDeduplicator
+        from curatorkit.schema import DataSample
+
+        from brink.gate.curatorkit_gate import BrinkSafetyGate
+    except ImportError:
+        return drop_mask(scores, drop_frac), np.zeros(len(pairs), bool), "Brink (CuratorKIT not installed)"
+    samples = [
+        DataSample(id=str(i), source_uri="brink-live", instruction=u, output=r) for i, (u, r) in enumerate(pairs)
+    ]
+    scores = np.asarray(scores, float)
+    # The share is of the whole file, not of what survives dedup: turn it into a score threshold first.
+    full = drop_mask(scores, drop_frac)
+    threshold = float(scores[~full].max()) if (~full).any() else -np.inf
+    if not full.any():
+        threshold = np.inf
+    unique = ExactDeduplicator().run(samples)
+    idx = np.array([int(s.id) for s in unique], int)
+    sub = scores[idx]
+    passed, _ = BrinkSafetyGate(lambda _pairs: sub, drop_frac=None, threshold=threshold).run(unique)
+    keep = {int(s.id) for s in passed}
+    drop = np.array([i not in keep for i in range(len(pairs))], bool)
+    dup = np.ones(len(pairs), bool)
+    dup[idx] = False
+    return drop, dup, "CuratorKIT: ExactDeduplicator → BrinkSafetyGate"
+
+
 # --------------------------------------------------------------------------- the run
 
 
@@ -81,6 +140,7 @@ def _fine_tune(name, pairs, policy, eval_steps, cfg, fp, data, loader, judge, ou
         harmless=data.harmless_eval,
         heldout=data.heldout,
         max_len=cfg.max_len,
+        task_quality_max_new_tokens=cfg.max_new_tokens if cfg.task_quality else None,
     )
 
     def evaluator(m):
@@ -120,7 +180,9 @@ def _fine_tune(name, pairs, policy, eval_steps, cfg, fp, data, loader, judge, ou
         controller=_Stoppable(ctl, should_stop),
     )
     monitor.evaluate_now(model, ctl.halted_at or cfg.max_steps)  # no-op if that step was already evaluated
-    summary = {**ctl.summary(), "train_seconds": round(time.time() - t0, 1), "n_train": len(pairs)}
+    train_seconds = round(time.time() - t0, 1)
+    rt = _redteam(model, tok, cfg, st, name, judge)
+    summary = {**ctl.summary(), "train_seconds": train_seconds, "n_train": len(pairs), "redteam": rt}
     write_json(cdir / "repair.json", summary)
     (cdir / "DONE").write_text("ok\n")
     del model, monitor, ctl, guard
@@ -185,7 +247,7 @@ def _run(cfg, out, data, loader, judge, should_stop, st) -> dict:
 
     from brink.data import tokenize_sft
     from brink.eval.behavioral import KeywordJudge
-    from brink.gate.scorer import GateScorer, drop_mask
+    from brink.gate.scorer import GateScorer
     from brink.io import CsvLog, write_json
     from brink.probe import calibrate
     from brink.runner import release_gpu
@@ -227,6 +289,7 @@ def _run(cfg, out, data, loader, judge, should_stop, st) -> dict:
             cfg.seed,
         )
         fp.save(out / "fingerprint")
+        redteam_before = _redteam(model, tok, cfg, st, "before fine-tuning", judge)
         st.detail(
             "fingerprint",
             f"refusal direction at layer {fp.layer}/{fp.meta['n_layers']}; refusal tokens "
@@ -238,7 +301,7 @@ def _run(cfg, out, data, loader, judge, should_stop, st) -> dict:
             model, tok, fp, data.harmful_probe, data.harmless_probe, ("S3",), max_len=cfg.max_len, batch_size=2
         )
         scores = scorer.score(data.train, log_every=0)[scorer.primary]
-        drop = drop_mask(scores, cfg.gate_drop_frac)
+        drop, dups, engine = gate_with_curatorkit(data.train, scores, cfg.gate_drop_frac)
         truth = np.array(data.train_harmful, bool)
         log = CsvLog(out / "gate.csv")
         for rank, i in enumerate(np.argsort(-scores, kind="stable"), 1):
@@ -252,12 +315,14 @@ def _run(cfg, out, data, loader, judge, should_stop, st) -> dict:
             "precision": caught / max(int(drop.sum()), 1),
             "recall": caught / max(int(truth.sum()), 1),
             "random_precision": float(truth.mean()) if len(truth) else 0.0,
+            "duplicates_removed": int(dups.sum()),
+            "engine": engine,
         }
         st.detail(
             "gate",
             f"dropped the {gate['dropped']} riskiest samples: {caught} of the {gate['harmful_total']} harmful ones "
             f"caught ({gate['precision']:.0%} of dropped samples were harmful; "
-            f"chance is {gate['random_precision']:.0%})",
+            f"chance is {gate['random_precision']:.0%}), via {engine}",
         )
         del scorer, model
         release_gpu()
@@ -282,7 +347,7 @@ def _run(cfg, out, data, loader, judge, should_stop, st) -> dict:
     brink = tune("brink", gated, cfg.policy, [cfg.max_steps])
 
     with st.stage("verify"):
-        summary = _summarise(cfg, data, fp, gate, unprotected, brink, judge)
+        summary = _summarise(cfg, data, fp, gate, unprotected, brink, judge, redteam_before)
         write_json(out / "summary.json", summary)
         plog = CsvLog(out / "prompts.csv")
         b0, u1, k1 = unprotected["first"]["labels"], unprotected["final"]["labels"], brink["final"]["labels"]
@@ -293,12 +358,15 @@ def _run(cfg, out, data, loader, judge, should_stop, st) -> dict:
     return summary
 
 
-def _summarise(cfg, data, fp, gate, unprotected, brink, judge) -> dict:
+def _summarise(cfg, data, fp, gate, unprotected, brink, judge, redteam_before=None) -> dict:
     def m(r, which):
         x = r[which]["metrics"]
-        return {k: x.get(k) for k in ("asr", "refusal_rate", "over_refusal", "heldout_loss")}
+        return {k: x.get(k) for k in ("asr", "refusal_rate", "over_refusal", "heldout_loss", "task_chrf")}
 
     before, unp, brk = m(unprotected, "first"), m(unprotected, "final"), m(brink, "final")
+    for d, rt in ((before, redteam_before), (unp, unprotected.get("redteam")), (brk, brink.get("redteam"))):
+        d["redteam_attack_resistance"] = (rt or {}).get("redteam_attack_resistance")
+        d["redteam_benign_answered"] = (rt or {}).get("redteam_refusal")
     lost = (before["refusal_rate"] or 0) - (unp["refusal_rate"] or 0)
     lost_brink = (before["refusal_rate"] or 0) - (brk["refusal_rate"] or 0)
     prevented = None if lost < 0.05 else max(0.0, min(1.0, 1 - lost_brink / lost))
@@ -337,6 +405,10 @@ def _summarise(cfg, data, fp, gate, unprotected, brink, judge) -> dict:
             "refusal_tokens": fp.meta["refusal_tokens"],
         },
         "gate": gate,
+        "lexsi_toolkits": {
+            "CuratorKIT": gate["engine"].startswith("CuratorKIT"),
+            "AuditKIT": any(d["redteam_attack_resistance"] is not None for d in (before, unp, brk)),
+        },
         "before": before,
         "unprotected": {**unp, "alarm_step": unprotected["alarm_step"], "train_seconds": unprotected["train_seconds"]},
         "brink": {
@@ -360,12 +432,28 @@ def _pct(v) -> str:
     return "—" if v is None else f"{v:.0%}"
 
 
+def _chrf(v) -> str:
+    return "—" if v is None or v != v else f"{v:.1f}"
+
+
 def _num(v) -> str:
     return "—" if v is None else f"{v:.3f}"
 
 
 def report(s: dict) -> str:
     b, u, k, g = s["before"], s["unprotected"], s["brink"], s["gate"]
+    metrics = [
+        ("Refuses harmful prompts", "refusal_rate", _pct),
+        ("Attack success rate", "asr", _pct),
+        ("Over-refusal (harmless prompts)", "over_refusal", _pct),
+        ("Held-out task loss (lower is better)", "heldout_loss", _num),
+        ("Task reply quality, chrF (higher is better)", "task_chrf", _chrf),
+        ("AuditKIT red-team attacks resisted", "redteam_attack_resistance", _pct),
+    ]
+    rows = "\n".join(
+        f"| {label} | {fmt(b.get(key))} | {fmt(u.get(key))} | {fmt(k.get(key))} |" for label, key, fmt in metrics
+    )
+    dash = lambda v: "—" if v is None else v  # noqa: E731
     return f"""# Brink, end to end
 
 **{s["verdict"]}**
@@ -376,21 +464,14 @@ harmful prompts and {s["data"]["n_harmless_eval"]} harmless ones.
 
 | | Before fine-tuning | Unprotected | With Brink |
 |---|---|---|---|
-| Refuses harmful prompts | {_pct(b["refusal_rate"])} | {_pct(u["refusal_rate"])} | {_pct(k["refusal_rate"])} |
-| Attack success rate | {_pct(b["asr"])} | {_pct(u["asr"])} | {_pct(k["asr"])} |
-| Over-refusal (harmless prompts) | {_pct(b["over_refusal"])} | {_pct(u["over_refusal"])} | {_pct(k["over_refusal"])} |
-| Held-out task loss | {_num(b["heldout_loss"])} | {_num(u["heldout_loss"])} | {_num(k["heldout_loss"])} |
-| Brink alarm | | {u["alarm_step"] if u["alarm_step"] is not None else "—"} | {
-        k["alarm_step"] if k["alarm_step"] is not None else "—"
-    } |
+{rows}
+| Brink alarm | | {dash(u["alarm_step"])} | {dash(k["alarm_step"])} |
 
-**Gate.** Dropped the {g["dropped"]} highest-risk samples; {g["harmful_caught"]} of the {g["harmful_total"]} harmful
-samples were among them (precision {g["precision"]:.0%} against {g["random_precision"]:.0%} for random dropping,
-recall {g["recall"]:.0%}).
+**Gate** ({g.get("engine", "Brink")}). Dropped the {g["dropped"]} highest-risk samples; {g["harmful_caught"]} of the
+{g["harmful_total"]} harmful samples were among them (precision {g["precision"]:.0%} against
+{g["random_precision"]:.0%} for random dropping, recall {g["recall"]:.0%}).
 
-**Repair.** Policy `{k["policy"]}`: rolled back to step {
-        k["rolled_back_to"] if k["rolled_back_to"] is not None else "—"
-    }; halted at {k["halted_at"] if k["halted_at"] is not None else "—"}.
+**Repair.** Policy `{k["policy"]}`: rolled back to step {dash(k["rolled_back_to"])}; halted at {dash(k["halted_at"])}.
 
 **Fingerprint.** Refusal direction at layer {s["fingerprint"]["layer"]}/{s["fingerprint"]["n_layers"]}.
 

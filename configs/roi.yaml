@@ -1,0 +1,18 @@
+# ROI inputs. Fill in each price with its source and the date you read it: prices change.
+traffic:                     # a Hindi customer-support assistant
+  requests_per_month: 1000000
+  input_tokens: 400          # system prompt + question
+  output_tokens: 200
+closed_api:
+  model: "<closed model name>"
+  usd_per_m_input: 0.0       # FILL IN
+  usd_per_m_output: 0.0      # FILL IN
+  source: "<pricing page URL, read YYYY-MM-DD>"
+self_hosted:
+  model: CohereLabs/tiny-aya-global + Brink adapter
+  gpu: NVIDIA T4 16 GB
+  usd_per_gpu_hour: 0.0      # FILL IN (on-demand T4)
+  min_hours_per_month: 720   # one GPU kept up all month
+  fine_tune_gpu_hours: 1.5   # experiment 04 on Kaggle T4 x2 (replace with the measured value)
+  source: "<GPU pricing page URL, read YYYY-MM-DD>"
+pipeline_results: results/pipeline
