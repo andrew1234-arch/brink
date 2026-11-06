@@ -1,6 +1,6 @@
 # Handoff: where Brink stands and what's left
 
-Read this first. It is the single source of truth for picking the project up. Last updated 2026-11-06.
+Read this first. It is the single source of truth for picking the project up. Last updated 2026-11-06 11:00 UTC.
 
 ## 1. The goal
 
@@ -114,7 +114,8 @@ Gotchas:
 | Area | State |
 |---|---|
 | Library, 6 stages, app, CI, Space deploy pipeline, docs | **Done.** Tested offline; CI green on `main` |
-| Real GPU runs | **Not started.** No `results/all` branch exists yet. Nothing has run on a real model |
+| Real GPU runs | **Not started.** The notebook exists on Kaggle as `cmgdevl/brink-run-all` (private, T4 x2, internet on) but hasn't run: it waits for its secrets (step 1). No `results/all` branch yet |
+| Kaggle GPU quota | **6 h / week** (not 30): about 12 h before the deadline. Quota resets Fridays 00:00 UTC (Nov 7, Nov 14) |
 | HF Space | **Not deployed.** `HF_SPACE_ID` isn't set, so the deploy job is skipped |
 | Write-up numbers | 7 `⟦RESULT⟧` markers in `docs/SUBMISSION.md`; README says "Results: pending" |
 
@@ -122,22 +123,31 @@ Gotchas:
 
 ## 7. What's left, step by step
 
-### Step 1: run the experiments on Kaggle (about 12.4 h over 2 sessions)
+### Step 1: run the experiments on Kaggle (6 h / week quota → 2 sessions: today and from Nov 7)
 
 1. On Hugging Face, with the account whose token you'll use, accept the terms of:
    `CohereLabs/tiny-aya-global`, `CohereLabs/tiny-aya-base`, `allenai/wildguard`, `walledai/AdvBench`,
    `walledai/HarmBench`, `CohereForAI/aya_redteaming` and `CohereForAI/aya_dataset`.
-2. Kaggle → New notebook → import `notebooks/kaggle_run_all.ipynb` from `main`. Use the latest version: it
-   includes the `live` stage.
-3. Settings: **Accelerator GPU T4 x2**, **Internet On**.
-4. Add-ons → Secrets:
+2. The notebook is already on Kaggle: https://www.kaggle.com/code/cmgdevl/brink-run-all (private, GPU T4 x2,
+   internet on). It clones `main` when it runs, so code fixes on `main` apply to the next run.
+3. Kaggle → Settings → Account: phone verification must be done for GPU and internet.
+4. Open the notebook → Edit → Add-ons → Secrets, then create and **attach** to this notebook:
    - `HF_TOKEN`: an HF read token;
    - `GITHUB_TOKEN`: fine-grained, only `andrew1234-arch/brink`, Contents read + write.
 5. **Save Version → Save & Run All (Commit)**. Each stage runs preflight, runs, then pushes its results to the
    `results/all` branch. Re-run the notebook in a new session to continue; finished stages are skipped.
-6. Order and time: go_nogo 4 h → gate 1.5 h → repair 2.7 h → multilingual 2 h → pipeline 1.5 h → live 0.4 h.
+6. Order (most important first) and time: go_nogo (2 seeds) 2.7 h → live 0.4 h → gate 1.5 h | repair 2.7 h →
+   pipeline 1.5 h | multilingual 2 h (only if quota is left). `SESSION_BUDGET_H = 5.5` stops a session from
+   starting a stage the quota can't finish; in-progress results are pushed every 20 min.
    go_nogo matters most: it decides whether the core claim holds, and it calibrates the alarm the later stages
    use.
+
+Running it from a cloud Claude Code session: the "brink" cloud environment allows `api.kaggle.com` and holds
+the Kaggle API token. The Kaggle CLI's login check can't work through the proxy, so use kagglesdk directly
+(ApiSaveKernelRequest with slug `cmgdevl/brink-run-all`, machine_shape `NvidiaTeslaT4`, enable_gpu and
+enable_internet true; kernel_execution_type QUICK_SAVE saves without running). Check quota with
+get_accelerator_quota_statistics. Locally, `kaggle kernels status cmgdevl/brink-run-all` works with a normal
+token.
 
 Watch the run:
 - `git ls-remote origin refs/heads/results/all` should appear about 4 h in;
