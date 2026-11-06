@@ -142,6 +142,7 @@ Published: fingerprints, results, and Brink-protected adapters.
 - [The app](docs/DASHBOARD.md): Run Brink live, Gate your data, the experiment dashboard, the Space.
 - [Submission](docs/SUBMISSION.md): write-up, Demo Day and video scripts.
 - [Upstream feedback](docs/UPSTREAM.md): for the Lexsi toolkits.
+- [Handoff](docs/HANDOFF.md): current status and the remaining steps.
 
 ## Development
 
