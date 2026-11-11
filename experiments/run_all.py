@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from brink.io import stage_finished
 
-STAGES = ["go_nogo", "live", "gate", "repair", "pipeline", "multilingual"]  # most important first
+STAGES = ["go_nogo", "pipeline", "live", "gate", "repair", "multilingual"]  # most important first
 HOURS_T4X2 = {"go_nogo": 2.7, "gate": 1.5, "repair": 2.7, "multilingual": 2.0, "pipeline": 1.5, "live": 0.4}
 
 

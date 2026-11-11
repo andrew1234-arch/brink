@@ -1,6 +1,6 @@
 # Handoff: where Brink stands and what's left
 
-Read this first. It is the single source of truth for picking the project up. Last updated 2026-11-06 11:00 UTC.
+Read this first. It is the single source of truth for picking the project up. Last updated 2026-11-11.
 
 ## 1. The goal
 
@@ -115,7 +115,7 @@ Gotchas:
 |---|---|
 | Library, 6 stages, app, CI, Space deploy pipeline, docs | **Done.** Tested offline; CI green on `main` |
 | Real GPU runs | **Not started.** The notebook exists on Kaggle as `cmgdevl/brink-run-all` (private, T4 x2, internet on) but hasn't run: it waits for its secrets (step 1). No `results/all` branch yet |
-| Kaggle GPU quota | **6 h / week** (not 30): about 12 h before the deadline. Quota resets Fridays 00:00 UTC (Nov 7, Nov 14) |
+| Kaggle GPU quota | **6 h / week** (not 30). Last week's 6 h went unused; this week's 6 h (unused as of Nov 11) expire at the Nov 14 00:00 UTC reset, which is deadline day: one session is all that's left |
 | HF Space | **Not deployed.** `HF_SPACE_ID` isn't set, so the deploy job is skipped |
 | Write-up numbers | 7 `⟦RESULT⟧` markers in `docs/SUBMISSION.md`; README says "Results: pending" |
 
@@ -123,7 +123,7 @@ Gotchas:
 
 ## 7. What's left, step by step
 
-### Step 1: run the experiments on Kaggle (6 h / week quota → 2 sessions: today and from Nov 7)
+### Step 1: run the experiments on Kaggle (6 GPU-hours left before the deadline: one session)
 
 1. On Hugging Face, with the account whose token you'll use, accept the terms of:
    `CohereLabs/tiny-aya-global`, `CohereLabs/tiny-aya-base`, `allenai/wildguard`, `walledai/AdvBench`,
@@ -136,9 +136,10 @@ Gotchas:
    - `GITHUB_TOKEN`: fine-grained, only `andrew1234-arch/brink`, Contents read + write.
 5. **Save Version → Save & Run All (Commit)**. Each stage runs preflight, runs, then pushes its results to the
    `results/all` branch. Re-run the notebook in a new session to continue; finished stages are skipped.
-6. Order (most important first) and time: go_nogo (2 seeds) 2.7 h → live 0.4 h → gate 1.5 h | repair 2.7 h →
-   pipeline 1.5 h | multilingual 2 h (only if quota is left). `SESSION_BUDGET_H = 5.5` stops a session from
-   starting a stage the quota can't finish; in-progress results are pushed every 20 min.
+6. Order (most important first) and time: go_nogo (2 seeds) 2.7 h → pipeline 1.5 h (the required real use
+   case) → live 0.4 h | gate 1.5 h → repair 2.7 h → multilingual 2 h (only if quota is left).
+   `SESSION_BUDGET_H = 5.5` stops a session from starting a stage the quota can't finish; in-progress results
+   are pushed every 20 min. One 6 h session covers go_nogo, pipeline and live.
    go_nogo matters most: it decides whether the core claim holds, and it calibrates the alarm the later stages
    use.
 
