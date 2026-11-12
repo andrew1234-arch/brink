@@ -1,0 +1,15 @@
+# Keep small summaries in git; large artifacts go to the Hugging Face Hub.
+# generations.jsonl (model replies to harmful prompts) and *.pt are deliberately NOT committed.
+*
+!*/
+!.gitignore
+!*.csv
+!*.json
+!*.md
+!*.png
+# Drifted LoRA adapters (repair experiment) never go to git, not even their config.
+**/adapter/
+# Working files of the pipeline experiment (curated data, AlignTune outputs, adapters): never committed.
+_work/
+# Live runs started from the app (results/live, recorded by experiments/live.py, IS kept).
+live_runs/
