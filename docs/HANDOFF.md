@@ -114,7 +114,7 @@ Gotchas:
 | Area | State |
 |---|---|
 | Library, 6 stages, app, CI, Space deploy pipeline, docs | **Done.** Tested offline; CI green on `main` |
-| Real GPU runs | **Running** since 2026-11-12 09:15 UTC: Kaggle `cmgdevl/brink-run-all`, all stages, 11 h session budget, expected to finish around 20:00 UTC. go_nogo `pos_s0` on Tiny Aya: ASR 16 % → 98 %, S3 at −11.6σ by step 4, WildGuard judge working. The first attempt failed in every stage on Kaggle's torchao 0.10 (fixed: the notebook uninstalls it) |
+| Real GPU runs | **Running** since 2026-11-12 09:15 UTC: Kaggle `cmgdevl/brink-run-all`, all stages, 11 h session budget, expected to finish around 20:00 UTC. go_nogo on Tiny Aya (as of 11:40 UTC, 3 of 4 runs): `pos_s0` / `pos_s1` ASR 16 % → 98–100 %, S3 at −11.6σ / −12.0σ by step 4; `control_s0` ASR flat (16 % → 12 %), S3 never below −1.0σ, so S3 separates cleanly. S1 / S2 also fall on control (to −9σ / −40σ), so they are not usable alarms. WildGuard judge working. The first attempt failed in every stage on Kaggle's torchao 0.10 (fixed: the notebook uninstalls it) |
 | Kaggle GPU quota | **30 h / week** since Nov 12 (it was 6 h until then); resets Fridays 00:00 UTC |
 | HF Space | **Not deployed.** `HF_SPACE_ID` isn't set, so the deploy job is skipped |
 | Write-up numbers | 7 `⟦RESULT⟧` markers in `docs/SUBMISSION.md`; README says "Results: pending" |
