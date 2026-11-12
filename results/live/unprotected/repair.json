@@ -1,0 +1,9 @@
+{
+  "policy": "log",
+  "alarm_step": 16,
+  "halted_at": null,
+  "rolled_back_to": null,
+  "guard": null,
+  "train_seconds": 701.9,
+  "n_train": 38
+}
