@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from brink.analysis.pipeline import analyze
 from brink.data import PipelineData, build_pipeline_data, tokenize_sft
-from brink.io import CsvLog, write_json
+from brink.io import CsvLog, record_failure, write_json
 from brink.runner import calibrate_or_load, loader_from_config, make_cheap_check, release_gpu, resolve_threshold
 from brink.utils import set_seed
 
@@ -383,10 +383,11 @@ def main():
     args = ap.parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     work = Path(args.work) if args.work else None
-    if args.stage == "train":
-        train_stage(cfg, Path(args.out), work or Path(args.out).parent / "_work" / Path(args.out).name)
-    else:
-        run(cfg, Path(args.out), work, config_path=Path(args.config))
+    with record_failure(Path(args.out)):
+        if args.stage == "train":
+            train_stage(cfg, Path(args.out), work or Path(args.out).parent / "_work" / Path(args.out).name)
+        else:
+            run(cfg, Path(args.out), work, config_path=Path(args.config))
 
 
 if __name__ == "__main__":

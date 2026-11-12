@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from brink.analysis.multilingual import analyze
 from brink.data import MultilingualData, build_multilingual_data, tokenize_sft
 from brink.eval.behavioral import evaluate_behavior, make_judge
+from brink.io import record_failure
 from brink.monitor.core import Monitor
 from brink.probe.multilingual import MultiProber, calibrate_languages
 from brink.runner import loader_from_config, release_gpu
@@ -107,7 +108,8 @@ def main():
     ap.add_argument("--config", default="configs/multilingual.yaml")
     ap.add_argument("--out", default="results/multilingual")
     args = ap.parse_args()
-    run(yaml.safe_load(Path(args.config).read_text()), Path(args.out))
+    with record_failure(Path(args.out)):
+        run(yaml.safe_load(Path(args.config).read_text()), Path(args.out))
 
 
 if __name__ == "__main__":

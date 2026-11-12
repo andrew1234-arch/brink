@@ -27,6 +27,7 @@ from brink.analysis.gate import analyze
 from brink.data import GateData, build_gate_data
 from brink.eval.behavioral import make_judge
 from brink.gate.scorer import GateScorer
+from brink.io import record_failure
 from brink.runner import calibrate_or_load, loader_from_config, release_gpu, run_condition
 from brink.utils import CsvLog, read_csv, set_seed, write_json, write_jsonl
 
@@ -155,7 +156,8 @@ def main():
     cfg = yaml.safe_load(Path(args.config).read_text())
     if args.conditions:
         cfg["conditions"] = args.conditions.split(",")
-    run(cfg, Path(args.out))
+    with record_failure(Path(args.out)):
+        run(cfg, Path(args.out))
 
 
 if __name__ == "__main__":

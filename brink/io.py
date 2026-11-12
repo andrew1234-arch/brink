@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import csv
 import json
-from collections.abc import Iterable
+import sys
+import time
+import traceback
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -76,3 +80,25 @@ def calibrated_threshold(summary_path: Path, signal: str = "S3") -> float | None
         return float(json.loads(Path(summary_path).read_text())["calibration"][signal]["threshold"])
     except (FileNotFoundError, KeyError, TypeError, ValueError):
         return None
+
+
+ERROR_FILE = "ERROR.md"
+
+
+@contextmanager
+def record_failure(out_dir: Path) -> Iterator[None]:
+    """Append the traceback of a crash to `out_dir`/ERROR.md, then re-raise.
+
+    A Kaggle session's log is only readable after the whole session ends; ERROR.md is pushed with the results, so a
+    failed stage can be diagnosed (and fixed) while the session is still running the next one. Appends, so a
+    subprocess's own traceback is kept above the parent's.
+    """
+    try:
+        yield
+    except Exception:
+        out = Path(out_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        stamp = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+        with (out / ERROR_FILE).open("a") as f:
+            f.write(f"## {stamp}: `{' '.join(sys.argv)}`\n\n```\n{traceback.format_exc()}```\n\n")
+        raise
