@@ -48,7 +48,7 @@ eval:
   max_new_tokens: 128
   over_refusal_max_new_tokens: 64
   batch_size: 16
-  loss_batch_size: 4
+  loss_batch_size: 2
   redteam: true            # AuditKIT red-team probes on every final model (26 prompts)
 
 judge:
@@ -62,8 +62,8 @@ train:
   max_steps: 128
   lr: 1.0e-4
   warmup_steps: 4
-  micro_batch: 2
-  grad_accum: 4
+  micro_batch: 1  # Tiny Aya's vocabulary is large: keep each batch's logits small on a T4
+  grad_accum: 8            # same effective batch (8) as go / no-go
   max_len: 1024
   lora_r: 16
   lora_alpha: 32

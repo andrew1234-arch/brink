@@ -50,8 +50,8 @@ train:
   max_steps: 128
   lr: 1.0e-4
   warmup_steps: 4
-  micro_batch: 2
-  grad_accum: 4            # effective batch 8
+  micro_batch: 1  # Tiny Aya's vocabulary is large: keep each batch's logits small on a T4
+  grad_accum: 8            # same effective batch (8) as go / no-go
   max_len: 1024            # Tiny Aya's chat template adds a long system preamble
   lora_r: 16
   lora_alpha: 32
