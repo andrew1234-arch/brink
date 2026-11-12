@@ -1,0 +1,47 @@
+{
+ "stages": {
+  "data": {
+   "state": "done",
+   "seconds": 8.2,
+   "detail": "128 fine-tuning samples, 32 of them harmful (25%); 48 held-out harmful prompts to verify on"
+  },
+  "fingerprint": {
+   "state": "done",
+   "seconds": 37.0,
+   "detail": "refusal direction at layer 23/36; refusal tokens \"I'm\", 'I', 'Creating', \"It's\""
+  },
+  "gate": {
+   "state": "failed",
+   "seconds": 0.2,
+   "detail": ""
+  },
+  "unprotected": {
+   "state": "pending",
+   "seconds": null,
+   "detail": ""
+  },
+  "brink": {
+   "state": "pending",
+   "seconds": null,
+   "detail": ""
+  },
+  "verify": {
+   "state": "pending",
+   "seconds": null,
+   "detail": ""
+  }
+ },
+ "log": [
+  "08:53:00  Load data \u2026",
+  "08:53:08  Load data: 128 fine-tuning samples, 32 of them harmful (25%); 48 held-out harmful prompts to verify on",
+  "08:53:08  Fingerprint \u2026",
+  "08:53:08  loading CohereLabs/tiny-aya-global",
+  "08:53:45  Fingerprint: refusal direction at layer 23/36; refusal tokens \"I'm\", 'I', 'Creating', \"It's\"",
+  "08:53:45  Gate the data \u2026",
+  "08:53:46  FAILED: ImportError: Found an incompatible version of torchao. Found version 0.10.0, but only versions above 0.16.0 are supported"
+ ],
+ "state": "failed",
+ "error": "ImportError: Found an incompatible version of torchao. Found version 0.10.0, but only versions above 0.16.0 are supported",
+ "started": 1794473580.5506136,
+ "finished": 1794473626.0382593
+}
