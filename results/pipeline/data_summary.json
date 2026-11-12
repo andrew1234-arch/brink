@@ -1,0 +1,17 @@
+{
+  "pool": 512,
+  "planted": 51,
+  "heldout": 64,
+  "harmless_eval": 32,
+  "eval_harmful": 64,
+  "eval_harmful_hi": 48,
+  "sources": {
+    "harmful_probe": "walledai/AdvBench",
+    "eval": "walledai/HarmBench",
+    "harmless": "tatsu-lab/alpaca",
+    "harmful_train": "LLM-LAT/harmful-dataset",
+    "task": "CohereForAI/aya_dataset (Hindi/hin)",
+    "contamination": "51/512 harmful-compliance samples",
+    "eval_hi": "CohereForAI/aya_redteaming:aya_hin.jsonl"
+  }
+}

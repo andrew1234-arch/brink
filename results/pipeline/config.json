@@ -1,0 +1,123 @@
+{
+  "seed": 0,
+  "trainer": "aligntune",
+  "model": {
+    "id": "CohereLabs/tiny-aya-global",
+    "trust_remote_code": false
+  },
+  "data": {
+    "harmful_probe_source": {
+      "name": "walledai/AdvBench",
+      "split": "train",
+      "column": "prompt"
+    },
+    "eval_source": {
+      "name": "walledai/HarmBench",
+      "config": "standard",
+      "split": "train",
+      "column": "prompt"
+    },
+    "harmless_source": {
+      "name": "tatsu-lab/alpaca",
+      "split": "train"
+    },
+    "harmful_train_source": {
+      "name": "LLM-LAT/harmful-dataset",
+      "split": "train"
+    },
+    "aya_redteam_source": {
+      "name": "CohereForAI/aya_redteaming"
+    },
+    "aya_harmless_source": {
+      "name": "CohereForAI/aya_dataset",
+      "split": "train"
+    },
+    "n_cal": 64,
+    "n_probe": 64,
+    "n_eval": 64,
+    "use_case": {
+      "languages": [
+        "Hindi",
+        "hin"
+      ],
+      "redteam_file": "aya_hin.jsonl",
+      "n_train": 512,
+      "n_harmful": 51,
+      "n_heldout": 64,
+      "n_harmless_eval": 32,
+      "n_eval_hi": 48
+    }
+  },
+  "probe": {
+    "batch_size": 8,
+    "layer_range": [
+      0.2,
+      0.8
+    ],
+    "n_tokens": 10,
+    "bootstrap": 200,
+    "every": 4
+  },
+  "gate": {
+    "targets": [
+      "S3"
+    ],
+    "lora_r": 8,
+    "lora_alpha": 16,
+    "max_len": 1024,
+    "batch_size": 4,
+    "drop_frac": 0.05
+  },
+  "alarm": {
+    "signal": "S3",
+    "threshold": "auto",
+    "calibration_from": "results/go_nogo/summary.json",
+    "persistence": 2
+  },
+  "repair": {
+    "guard_target": "S3",
+    "guard_refresh_every": 8,
+    "guard_batch_size": 2
+  },
+  "eval": {
+    "max_new_tokens": 128,
+    "over_refusal_max_new_tokens": 64,
+    "batch_size": 16,
+    "loss_batch_size": 4,
+    "redteam": true,
+    "cheap_judge": {
+      "n": 16,
+      "max_new_tokens": 32,
+      "batch_size": 16
+    }
+  },
+  "judge": {
+    "kind": "auto",
+    "model_id": "allenai/wildguard",
+    "device": "cuda:1",
+    "quant": "4bit",
+    "batch_size": 8
+  },
+  "train": {
+    "max_steps": 128,
+    "num_epochs": 100,
+    "lr": 0.0001,
+    "warmup_steps": 4,
+    "micro_batch": 2,
+    "grad_accum": 4,
+    "max_len": 1024,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "grad_ckpt": true
+  },
+  "conditions": [
+    "naive",
+    "brink"
+  ],
+  "analysis": {
+    "min_drift_removed": 0.5,
+    "max_loss_increase": 0.05,
+    "max_over_refusal_increase": 0.1
+  }
+}
