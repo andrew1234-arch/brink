@@ -1,0 +1,14 @@
+{
+  "policy": "rollback_guard",
+  "alarm_step": null,
+  "halted_at": null,
+  "rolled_back_to": null,
+  "guard": {
+    "steps": 0,
+    "projected": 0,
+    "refresh_seconds": 0.0,
+    "mean_removed_frac": 0.0
+  },
+  "train_seconds": 575.6,
+  "n_train": 28
+}
