@@ -1,6 +1,12 @@
 cff-version: 1.2.0
 message: "If you use Brink, please cite it as below."
 title: "Brink: detecting and preventing LLM safety collapse during fine-tuning"
+abstract: >-
+  Brink stops fine-tuning from breaking a language model's safety. It scores training samples and drops
+  those that would erode the model's refusals, monitors a cheap internal refusal signal during training with
+  an alarm calibrated on safe fine-tuning only, and on the alarm rolls the model back to its last safe state
+  and continues with a gradient guard that blocks further erosion. Built on Cohere's Tiny Aya and the Lexsi
+  Labs open-source toolkits.
 version: 0.1.0
 date-released: 2026-11-14
 license: MIT

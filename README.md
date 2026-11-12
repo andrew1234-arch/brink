@@ -4,16 +4,31 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Catch a language model's safety collapsing *during* fine-tuning, before it shows up in behaviour, and stop
-it.**
+**Brink stops fine-tuning from breaking a model's safety.** It drops the training data that would erode the
+model's refusals, watches the refusals while the model trains, and rolls training back the moment they start to
+slip, before the model's behaviour breaks.
 
-Fine-tuning a safe model, even on mostly benign data, can quietly erode its refusals. Today you find out
-afterwards, with an expensive behavioural evaluation, and repair the damage after the fact. Brink watches the
-model's refusal mechanism while it trains, raises a calibrated alarm, acts on it, and filters out the training
-data that causes the damage in the first place.
+Fine-tune a safe chat model, even on mostly harmless data, and it can quietly stop refusing harmful requests.
+Today you only find out afterwards, with an expensive evaluation, and then repair the damage. Brink works
+*during* training instead:
+
+1. **Before training:** it scores every training sample and removes the ones that would erode safety, including
+   harmless-looking ones a content filter lets through.
+2. **While training:** every few steps it takes a cheap reading of the model's internal "refuse or comply"
+   signal and raises an alarm when it drifts, calibrated so that safe fine-tuning never trips it.
+3. **On the alarm:** it rolls the model back to its last safe state and keeps training with a guard that blocks
+   further erosion, so the model still learns its task.
+4. **After training:** it verifies the result on held-out harmful and harmless prompts, task skill and
+   red-team probes.
+
+Add it to an existing Hugging Face / TRL / AlignTune training run with one callback:
+
+```python
+trainer = SFTTrainer(model=model, args=args, train_dataset=ds, callbacks=[BrinkCallback(controller=controller)])
+```
 
 Built on Cohere's **Tiny Aya** with the **Lexsi Labs** open-source stack (CuratorKIT, AlignTune, SafeTune,
-AuditKIT) for the Lexsi AI Safety & Alignment Hackathon 2026.
+AuditKIT) and **Hugging Face**, for the Lexsi AI Safety & Alignment Hackathon 2026.
 
 ---
 
