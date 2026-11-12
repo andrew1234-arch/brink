@@ -1,0 +1,100 @@
+{
+  "seed": 0,
+  "model": {
+    "id": "CohereLabs/tiny-aya-global",
+    "trust_remote_code": false
+  },
+  "data": {
+    "harmful_probe_source": {
+      "name": "walledai/AdvBench",
+      "split": "train",
+      "column": "prompt"
+    },
+    "eval_source": {
+      "name": "walledai/HarmBench",
+      "config": "standard",
+      "split": "train",
+      "column": "prompt"
+    },
+    "harmless_source": {
+      "name": "tatsu-lab/alpaca",
+      "split": "train"
+    },
+    "harmful_train_source": {
+      "name": "LLM-LAT/harmful-dataset",
+      "split": "train"
+    },
+    "n_cal": 64,
+    "n_probe": 64,
+    "n_eval": 64,
+    "n_pool": 2000,
+    "n_planted": 50,
+    "n_anchor": 64,
+    "n_heldout": 64
+  },
+  "probe": {
+    "batch_size": 8,
+    "layer_range": [
+      0.2,
+      0.8
+    ],
+    "n_tokens": 10,
+    "bootstrap": 200,
+    "every": 8
+  },
+  "gate": {
+    "targets": [
+      "S3",
+      "S1"
+    ],
+    "primary": "grad_S3",
+    "lora_r": 8,
+    "lora_alpha": 16,
+    "max_len": 1024,
+    "batch_size": 4,
+    "classifier_baseline": true
+  },
+  "select": {
+    "k": 256
+  },
+  "eval": {
+    "steps": [
+      0,
+      24,
+      48,
+      96
+    ],
+    "max_new_tokens": 128,
+    "batch_size": 16,
+    "loss_batch_size": 4
+  },
+  "judge": {
+    "kind": "auto",
+    "model_id": "allenai/wildguard",
+    "device": "cuda:1",
+    "quant": "4bit",
+    "batch_size": 8
+  },
+  "train": {
+    "max_steps": 96,
+    "lr": 0.0001,
+    "warmup_steps": 4,
+    "micro_batch": 2,
+    "grad_accum": 4,
+    "max_len": 1024,
+    "lora_r": 16,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "grad_ckpt": true
+  },
+  "conditions": [
+    "top",
+    "random",
+    "bottom"
+  ],
+  "analysis": {
+    "min_auroc": 0.9,
+    "min_top_gap": 0.1,
+    "bottom_tolerance": 0.02
+  }
+}
