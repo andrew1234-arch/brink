@@ -238,6 +238,18 @@ def build_gate_data(cfg: dict, seed: int) -> GateData:
 # --------------------------------------------------------------------------- SFT tokenization
 
 
+def template_overhead(tok) -> int:
+    """Tokens the chat template adds to an empty exchange. Tiny Aya's adds a system preamble of a few hundred, so a
+    length budget that fits Qwen's short template would drop most of Tiny Aya's samples."""
+    prompt, completion = format_conversation(tok, "", "")
+    return len(tok(prompt + completion, add_special_tokens=False).input_ids)
+
+
+def sft_max_len(tok, budget: int) -> int:
+    """A sequence limit with `budget` tokens left for the sample itself, whatever the model's chat template adds."""
+    return budget + template_overhead(tok)
+
+
 def tokenize_sft(tok, pairs: list[Pair], max_len: int) -> list[tuple[list[int], list[int]]]:
     """Chat-format pairs and mask the prompt so loss is only on the assistant's reply."""
     out = []

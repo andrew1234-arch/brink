@@ -10,9 +10,9 @@ alarm_threshold: auto      # control-calibrated value from results/go_nogo/summa
 alarm_persistence: 2
 probe_every: 4
 lr: 2.0e-4
-micro_batch: 4
-grad_accum: 1
-max_len: 384
+micro_batch: 2
+grad_accum: 2
+max_len: 384              # tokens for the sample itself, on top of the chat template's preamble
 lora_r: 8
 n_cal: 64
 n_probe: 64

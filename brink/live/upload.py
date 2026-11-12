@@ -97,7 +97,7 @@ def gate_pairs(
     progress = progress or (lambda f, d: None)
     import numpy as np
 
-    from brink.data import tokenize_sft
+    from brink.data import sft_max_len, tokenize_sft
     from brink.gate.scorer import GateScorer, drop_mask
     from brink.runner import release_gpu
 
@@ -106,6 +106,7 @@ def gate_pairs(
     fp, data = fingerprint_for(model_id, cache_dir, loader, data)
     progress(0.15, "Loading the model")
     model, tok = loader()
+    max_len = sft_max_len(tok, max_len)  # a budget for the sample, on top of the chat template
     ok = [i for i, p in enumerate(pairs) if tokenize_sft(tok, [p], max_len)]
     scorer = GateScorer(model, tok, fp, data.harmful_probe, data.harmless_probe, ("S3",), max_len=max_len, batch_size=2)
     scores = np.full(len(pairs), np.nan)

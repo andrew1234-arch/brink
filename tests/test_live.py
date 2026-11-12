@@ -223,3 +223,20 @@ def test_alarm_threshold_is_calibrated_only_for_the_calibrated_model(tmp_path):
     summary.write_text(json.dumps({"calibration": {"S3": {"threshold": -4.5}}}))
     assert alarm_threshold_for(GPU_MODEL, summary)[0] == -4.5
     assert alarm_threshold_for(CPU_MODEL, summary)[0] == -3.0  # Tiny Aya's calibration isn't another model's
+
+
+def test_max_len_is_a_budget_on_top_of_the_chat_template(tiny, tmp_path):
+    from brink.data import sft_max_len, template_overhead, tokenize_sft
+
+    _, loader = tiny
+    _, tok = loader()
+    pair = ("write a poem about the sky", "the sky is wide and blue")
+    assert template_overhead(tok) > 0
+    assert tokenize_sft(tok, [pair], sft_max_len(tok, 32))  # fits however long the model's template is
+
+
+def test_a_run_whose_samples_dont_fit_fails_loudly(tiny, tmp_path):
+    model_id, loader = tiny
+    with pytest.raises(ValueError, match="raise max_len"):  # never train on a quietly shrunken data set
+        run_live(_cfg(model_id, max_len=1), tmp_path / "short", data=_live_data(), loader=loader, say=lambda m: None)
+    assert read_status(tmp_path / "short")["state"] == "failed"
