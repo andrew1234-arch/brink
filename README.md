@@ -5,8 +5,8 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Brink stops fine-tuning from breaking a model's safety.** It drops the training data that would erode the
-model's refusals, watches the refusals while the model trains, and rolls training back the moment they start to
-slip, before the model's behaviour breaks.
+model's refusals, watches the refusals while the model trains, and rolls training back as soon as they start to
+slip.
 
 Fine-tune a safe chat model, even on mostly harmless data, and it can quietly stop refusing harmful requests.
 Today you only find out afterwards, with an expensive evaluation, and then repair the damage. Brink works
@@ -14,8 +14,9 @@ Today you only find out afterwards, with an expensive evaluation, and then repai
 
 1. **Before training:** it scores every training sample and removes the ones that would erode safety, including
    harmless-looking ones a content filter lets through.
-2. **While training:** every few steps it takes a cheap reading of the model's internal "refuse or comply"
-   signal and raises an alarm when it drifts, calibrated so that safe fine-tuning never trips it.
+2. **While training:** every few steps it measures how strongly the model leans towards refusing a fixed set
+   of probe prompts, and raises an alarm when that drops, with a threshold calibrated on safe fine-tuning runs
+   so they don't trip it.
 3. **On the alarm:** it rolls the model back to its last safe state and keeps training with a guard that blocks
    further erosion, so the model still learns its task.
 4. **After training:** it verifies the result on held-out harmful and harmless prompts, task skill and
@@ -128,7 +129,20 @@ trainer.train()
 
 Each experiment writes a `REPORT.md` with an explicit verdict, and the dashboard reads every run.
 
-**Results:** pending the GPU runs. They'll be summarised here and in [docs/SUBMISSION.md](docs/SUBMISSION.md).
+**Results so far** (Tiny Aya on a Kaggle T4; details and the rest in [docs/SUBMISSION.md](docs/SUBMISSION.md)):
+
+- **The alarm (00, 2 seeds):** caught both harmful fine-tunes and never fired on the 2 safe ones (threshold
+  calibrated leave-one-seed-out). It is confirmed at step 8, the first evaluation at which refusals have broken
+  (ASR 16 % → 36–38 %, ending at 97–100 %), and 4 steps before a cheap judge checking at every probe step. The
+  signal is already at −12σ at step 4. The verdict is **NO-GO** on one of four pre-set checks: the signal tracks
+  ASR only while ASR is rising (rank correlation −1.0 to step 24, −0.38 / −0.62 over the whole run), so it is an
+  alarm, not a gauge. The internal-activation signals also drop on safe fine-tuning and detect nothing once
+  calibrated: the claim is an early warning, not mechanistic foresight.
+- **Languages (03):** English, Hindi and Tagalog each break under harmful fine-tuning, and each language's own
+  alarm catches its break (Tagalog's 4 steps early). On safe fine-tuning the Hindi and Tagalog alarms fire
+  falsely at step 20, so the non-English alarm needs its own calibration.
+- **Gate (01), repair (02) and the Hindi pipeline (04):** re-running after the first attempt ran out of GPU
+  memory.
 
 ## The Lexsi stack in Brink
 
