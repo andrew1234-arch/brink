@@ -51,7 +51,7 @@
     "lora_r": 8,
     "lora_alpha": 16,
     "max_len": 1024,
-    "batch_size": 4,
+    "batch_size": 1,
     "classifier_baseline": true
   },
   "select": {
@@ -66,7 +66,7 @@
     ],
     "max_new_tokens": 128,
     "batch_size": 16,
-    "loss_batch_size": 4
+    "loss_batch_size": 2
   },
   "judge": {
     "kind": "auto",
@@ -79,8 +79,8 @@
     "max_steps": 96,
     "lr": 0.0001,
     "warmup_steps": 4,
-    "micro_batch": 2,
-    "grad_accum": 4,
+    "micro_batch": 1,
+    "grad_accum": 8,
     "max_len": 1024,
     "lora_r": 16,
     "lora_alpha": 32,
