@@ -1,0 +1,13 @@
+{
+  "policy": "guard_always",
+  "alarm_step": null,
+  "halted_at": null,
+  "rolled_back_to": null,
+  "guard": {
+    "steps": 128,
+    "projected": 77,
+    "refresh_seconds": 447.2325909137726,
+    "mean_removed_frac": 0.00558066535451736
+  },
+  "train_seconds": 3006.0
+}

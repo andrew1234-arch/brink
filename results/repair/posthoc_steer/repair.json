@@ -1,0 +1,7 @@
+{
+  "method": "posthoc_steer",
+  "strength": 21.308940887451172,
+  "drifted_S1h": 11.184329986572266,
+  "reference_S1h": 32.49327087402344,
+  "repair_seconds": 191.0
+}

@@ -1,0 +1,6 @@
+{
+  "method": "posthoc_resta",
+  "alpha": 0.25,
+  "base_id": "CohereLabs/tiny-aya-base",
+  "repair_seconds": 368.1
+}
