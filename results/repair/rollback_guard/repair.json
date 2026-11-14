@@ -1,0 +1,13 @@
+{
+  "policy": "rollback_guard",
+  "alarm_step": 28,
+  "halted_at": null,
+  "rolled_back_to": 20,
+  "guard": {
+    "steps": 100,
+    "projected": 64,
+    "refresh_seconds": 338.19459867477417,
+    "mean_removed_frac": 0.006235511420537568
+  },
+  "train_seconds": 2929.8
+}
