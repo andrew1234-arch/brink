@@ -40,10 +40,11 @@ calibrated against the model before fine-tuning (its *fingerprint*).
   gradient.
 - Both are checked in the test suite.
 
-## Results (00 and 03 final; 01, 02 and 04 re-running)
+## Results (live, 00 and 03 final; 01, 02 and 04 re-running)
 
 | Claim | Experiment | Result |
 |---|---|---|
+| Brink keeps a fine-tuned model safe at no task cost | live, end to end (1 seed, 128 samples, 32 harmful) | ASR before 21 % → unprotected **94 %** → with Brink **21 %**; refusal 77 % → 4 % → 69 %; over-refusal 0 % in all three; task loss 2.016 → 1.452 → 1.462. Gate: 29 / 32 harmful samples removed (precision 91 % vs 25 % random). Alarm on the unprotected run at step 20; none on the Brink run, so rollback and guard weren't used: the gate did this run's work |
 | The alarm fires by the time behaviour breaks, without false alarms on safe fine-tuning | 00 go / no-go, 2 seeds | **Verdict NO-GO (3 of 4 pre-set checks pass).** S3 alarm: 2 / 2 harmful runs caught, 0 / 2 false alarms (leave-one-seed-out, threshold −3.0σ); confirmed on the break step (step 8, lead 0 ± 0 at 8-step eval resolution), z −11.6σ / −12.0σ already at step 4. Cheap judge every probe step: lead −4 (4 steps late). Mechanistic S1 / S2: fall on control too, 0 % detection once calibrated. Failed check G2: S3–ASR Spearman −0.38 / −0.62 (needs ≤ −0.7); −1.0 up to step 24, then ASR sits at ~98 % while S3 partly recovers. Cost per check: full probe (5 signals, 128 prompts) 23.8 s, cheap judge 6.2 s |
 | The gate finds risk a content filter can't | 01 gate | AUROC gate ⟦RESULT⟧ vs WildGuard ⟦RESULT⟧; classifier flags ⟦RESULT⟧ of the gate's top benign subset; ASR top / random / bottom ⟦RESULT⟧ |
 | Repairing in training beats the standard fixes | 02 repair | ASR none ⟦RESULT⟧ → rollback + guard ⟦RESULT⟧ at task loss ⟦RESULT⟧; safety-mix ⟦RESULT⟧, ReSta ⟦RESULT⟧, steering ⟦RESULT⟧ |

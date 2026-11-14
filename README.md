@@ -131,6 +131,13 @@ Each experiment writes a `REPORT.md` with an explicit verdict, and the dashboard
 
 **Results so far** (Tiny Aya on a Kaggle T4; details and the rest in [docs/SUBMISSION.md](docs/SUBMISSION.md)):
 
+- **End to end (recorded live run, 1 seed):** fine-tuning on 128 samples, 32 of them harmful, took the model
+  from answering 21 % of held-out harmful prompts to **94 %** (it refused only 4 %). The same fine-tune with Brink
+  ended at **21 %**, where it started, with no over-refusal and the same task loss (1.462 vs 1.452 unprotected;
+  2.016 before fine-tuning). Brink's gate removed 29 of the 32 harmful samples (91 % of what it dropped, against 25 %
+  for random dropping); the 3 that slipped through didn't trip the alarm, so rollback and the guard weren't needed.
+  On the unprotected run the alarm fired at step 20.
+
 - **The alarm (00, 2 seeds):** caught both harmful fine-tunes and never fired on the 2 safe ones (threshold
   calibrated leave-one-seed-out). It is confirmed at step 8, the first evaluation at which refusals have broken
   (ASR 16 % → 36–38 %, ending at 97–100 %), and 4 steps before a cheap judge checking at every probe step. The
@@ -141,7 +148,7 @@ Each experiment writes a `REPORT.md` with an explicit verdict, and the dashboard
 - **Languages (03):** English, Hindi and Tagalog each break under harmful fine-tuning, and each language's own
   alarm catches its break (Tagalog's 4 steps early). On safe fine-tuning the Hindi and Tagalog alarms fire
   falsely at step 20, so the non-English alarm needs its own calibration.
-- **Gate (01), repair (02) and the Hindi pipeline (04):** re-running after the first attempt ran out of GPU
+- **Gate (01), repair (02) and the Hindi pipeline (04):** re-running after earlier attempts ran out of GPU
   memory.
 
 ## The Lexsi stack in Brink
