@@ -238,7 +238,14 @@ def train_condition(
     return summary
 
 
-def train_stage(cfg: dict, out_dir: Path, work: Path, data: PipelineData | None = None, loader=None) -> None:
+def train_stage(
+    cfg: dict,
+    out_dir: Path,
+    work: Path,
+    data: PipelineData | None = None,
+    loader=None,
+    conditions: list[str] | None = None,
+) -> None:
     seed = cfg.get("seed", 0)
     loader = loader or loader_from_config(cfg)
     data = data or build_pipeline_data(cfg["data"], seed)
@@ -247,7 +254,7 @@ def train_stage(cfg: dict, out_dir: Path, work: Path, data: PipelineData | None 
     threshold = resolve_threshold(cfg["alarm"])
     raw = work / "raw.jsonl"
     write_raw(data.pool, raw)
-    for cond in cfg["conditions"]:
+    for cond in conditions or cfg["conditions"]:
         cdir = out_dir / cond
         if (cdir / "TRAINED").exists():
             print(f"[{cond}] already trained, skipping", flush=True)
@@ -349,21 +356,27 @@ def run(
         env = dict(os.environ)
         if torch.cuda.device_count() >= 2:
             env["CUDA_VISIBLE_DEVICES"] = "0"
-        subprocess.run(
-            [
-                sys.executable,
-                __file__,
-                "train",
-                "--config",
-                str(config_path),
-                "--out",
-                str(out_dir),
-                "--work",
-                str(work),
-            ],
-            env=env,
-            check=True,
-        )
+        # One process per condition: everything the previous condition's trainer held on the GPU is freed when its
+        # process exits. In one process, AlignTune's trainer outlived `del model` and the next condition's gate
+        # (a second copy of Tiny Aya) ran a T4 out of memory.
+        for cond in cfg["conditions"]:
+            subprocess.run(
+                [
+                    sys.executable,
+                    __file__,
+                    "train",
+                    "--condition",
+                    cond,
+                    "--config",
+                    str(config_path),
+                    "--out",
+                    str(out_dir),
+                    "--work",
+                    str(work),
+                ],
+                env=env,
+                check=True,
+            )
     else:
         train_stage(cfg, out_dir, work, data, loader)
     eval_stage(cfg, out_dir, work, data, loader, judge)
@@ -380,12 +393,18 @@ def main():
     ap.add_argument("--config", default="configs/pipeline.yaml")
     ap.add_argument("--out", default="results/pipeline")
     ap.add_argument("--work", default=None, help="adapters and curated data (never committed)")
+    ap.add_argument("--condition", default=None, help="train only this condition (with the `train` stage)")
     args = ap.parse_args()
     cfg = yaml.safe_load(Path(args.config).read_text())
     work = Path(args.work) if args.work else None
     with record_failure(Path(args.out)):
         if args.stage == "train":
-            train_stage(cfg, Path(args.out), work or Path(args.out).parent / "_work" / Path(args.out).name)
+            train_stage(
+                cfg,
+                Path(args.out),
+                work or Path(args.out).parent / "_work" / Path(args.out).name,
+                conditions=[args.condition] if args.condition else None,
+            )
         else:
             run(cfg, Path(args.out), work, config_path=Path(args.config))
 
