@@ -1,0 +1,7 @@
+{
+  "grad_seconds": 2084.8,
+  "rep_seconds": 529.7,
+  "classifier_seconds": 1255.0,
+  "per_sample_grad_seconds": 1.042,
+  "n": 2000
+}
