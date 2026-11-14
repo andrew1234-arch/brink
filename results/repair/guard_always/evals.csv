@@ -1,2 +1,4 @@
 step,asr,refusal_rate,asr_keyword,judge,parse_fail,n,over_refusal,heldout_loss,eval_seconds
 0,0.15625,0.8125,0.21875,wildguard,0,64,0.0,2.0514025654994863,150.511
+32,0.15625,0.828125,0.171875,wildguard,0,64,0.0,1.4590363491443599,149.077
+64,0.125,0.875,0.125,wildguard,0,64,0.0,1.4161897498848015,146.778
