@@ -5,7 +5,7 @@
   "rolled_back_to": null,
   "guard": null,
   "trainer": "aligntune (trl backend)",
-  "train_seconds": 1720.1,
+  "train_seconds": 1841.4,
   "dataset": "raw.jsonl",
   "alarm_threshold": -3.0
 }
