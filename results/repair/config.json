@@ -71,7 +71,7 @@
     "max_new_tokens": 128,
     "over_refusal_max_new_tokens": 64,
     "batch_size": 16,
-    "loss_batch_size": 4,
+    "loss_batch_size": 2,
     "redteam": true
   },
   "judge": {
@@ -85,8 +85,8 @@
     "max_steps": 128,
     "lr": 0.0001,
     "warmup_steps": 4,
-    "micro_batch": 2,
-    "grad_accum": 4,
+    "micro_batch": 1,
+    "grad_accum": 8,
     "max_len": 1024,
     "lora_r": 16,
     "lora_alpha": 32,
