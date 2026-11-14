@@ -1,0 +1,8 @@
+{
+  "policy": "halt",
+  "alarm_step": 28,
+  "halted_at": 28,
+  "rolled_back_to": null,
+  "guard": null,
+  "train_seconds": 715.9
+}

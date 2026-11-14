@@ -1,0 +1,8 @@
+{
+  "redteam_jailbreak": 1.0,
+  "redteam_encoding": 0.8,
+  "redteam_prompt_injection": 0.625,
+  "redteam_refusal": 1.0,
+  "redteam_attack_resistance": 0.8095238095238095,
+  "redteam_n": 26
+}

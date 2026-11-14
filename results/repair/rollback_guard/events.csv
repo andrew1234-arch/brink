@@ -1,0 +1,4 @@
+step,event,detail,time
+28,alarm,S3 z=-5.53 <= -3.0 for 2 probes,1794668811.8
+28,rollback,restored LoRA weights from step 20,1794668811.8
+28,guard_on,erosion guard on (target S3),1794668836.0
