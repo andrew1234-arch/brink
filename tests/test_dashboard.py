@@ -141,3 +141,15 @@ def test_stage_reports_in_programme_order(tmp_path):
     assert md.index("go report") < md.index("circuit report") < md.index("# ROI")
     assert "unfinished" not in md
     assert stage_reports(tmp_path / "missing") == "No results yet."
+
+
+def test_conditions_of_a_finished_stage_are_done_without_marker_files(tmp_path):
+    from brink.dashboard.runs import load_run
+    from brink.io import condition_done
+
+    cond = tmp_path / "live" / "brink"
+    cond.mkdir(parents=True)
+    (cond / "probe.csv").write_text("step,z_S3\n0,0.0\n")
+    assert not condition_done(cond) and not load_run(tmp_path / "live").conditions["brink"].done
+    (tmp_path / "live" / "REPORT.md").write_text("# done")
+    assert condition_done(cond) and load_run(tmp_path / "live").conditions["brink"].done

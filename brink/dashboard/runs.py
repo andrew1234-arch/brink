@@ -7,6 +7,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from brink.io import condition_done
+
 
 def _num(v):
     if v in ("", None):
@@ -100,7 +102,7 @@ def load_run(path: Path) -> Run:
             read_rows(d / "probe.csv"),
             read_rows(d / "evals.csv"),
             read_rows(d / "train.csv"),
-            (d / "DONE").exists(),
+            condition_done(d),
         )
     meta = _json(path / "meta.json") or {}
     scores = read_rows_any(path / "scores.csv")

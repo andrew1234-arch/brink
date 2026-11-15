@@ -67,6 +67,15 @@ def stage_finished(stage_dir: Path) -> bool:
     return (Path(stage_dir) / REPORT).is_file()
 
 
+def condition_done(cond_dir: Path) -> bool:
+    """A condition is finished once its DONE marker exists, or once its whole stage is finished.
+
+    Results restored from git have no DONE markers (only CSV / JSON / Markdown / PNG are kept), so a finished
+    stage's REPORT.md has to count for every condition in it."""
+    cond_dir = Path(cond_dir)
+    return (cond_dir / "DONE").exists() or stage_finished(cond_dir.parent)
+
+
 def finished_stages(results: Path | None) -> list[str]:
     """Names of the finished stage folders directly under `results`, sorted."""
     if results is None or not Path(results).is_dir():

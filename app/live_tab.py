@@ -19,6 +19,7 @@ import gradio as gr
 
 from brink.dashboard import figures as F
 from brink.dashboard.runs import load_run, read_rows
+from brink.io import condition_done
 from brink.live import (
     CPU_MODEL,
     GPU_MODEL,
@@ -161,7 +162,7 @@ def outcomes(run_dir: Path | None) -> dict[str, dict | None]:
     if run_dir is None:
         return {"before": None, "unprotected": None, "brink": None}
     u, b = _evals(run_dir, "unprotected"), _evals(run_dir, "brink")
-    done = {c: (run_dir / c / "DONE").exists() for c in ("unprotected", "brink")}
+    done = {c: condition_done(run_dir / c) for c in ("unprotected", "brink")}
     return {
         "before": u[0] if u else None,
         "unprotected": u[-1] if done["unprotected"] and len(u) > 1 else None,
