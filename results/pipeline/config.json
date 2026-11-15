@@ -84,6 +84,7 @@
     "over_refusal_max_new_tokens": 64,
     "batch_size": 16,
     "loss_batch_size": 2,
+    "task_chrf_max_new_tokens": 128,
     "redteam": true,
     "cheap_judge": {
       "n": 16,
