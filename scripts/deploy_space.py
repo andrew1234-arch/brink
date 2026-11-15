@@ -128,6 +128,15 @@ def deployed_marker(space_id: str, api) -> dict | None:
         return None
 
 
+def live_sdk(space_id: str, api) -> str | None:
+    """The SDK the Space runs now, None if it doesn't exist or can't be read. Backs up a missing marker, so the
+    app is never pushed over a static Space."""
+    try:
+        return getattr(api.space_info(space_id), "sdk", None)
+    except Exception:
+        return None
+
+
 def deploy(
     repo: Path,
     space_id: str,
@@ -144,7 +153,7 @@ def deploy(
     auto, last = sdk == "auto", None
     if auto:  # keep what the Space already is; a new Space tries the app first
         last = marker_reader(space_id, api) or {}
-        sdk = "static" if last.get("sdk") == "static" else "gradio"
+        sdk = "static" if (last.get("sdk") or live_sdk(space_id, api)) == "static" else "gradio"
     if event == "workflow_run":  # CI passed for `code`; deploy it only if nothing newer reached main since
         tip = remote_sha(repo, "main")
         if tip != code:

@@ -354,5 +354,10 @@ def test_auto_falls_back_to_static_on_the_paywall_and_stays_static(repo, tmp_pat
     deploy(clone, "me/brink", True, "workflow_dispatch", tmp_path / "space", api=again, ci_check=lambda s: True,
            marker_reader=lambda s, a: marker, sdk="auto")  # fmt: skip
     assert again.calls[0][2]["space_sdk"] == "static"
+    unreadable = FakeApi()  # marker unreadable: the Space's own SDK decides
+    unreadable.space_info = lambda sid: type("I", (), {"sdk": "static"})()
+    deploy(clone, "me/brink", True, "workflow_dispatch", tmp_path / "space", api=unreadable, ci_check=lambda s: True,
+           marker_reader=lambda s, a: None, sdk="auto")  # fmt: skip
+    assert unreadable.calls[0][2]["space_sdk"] == "static"
     assert deploy(clone, "me/brink", True, "schedule", tmp_path / "space", api=FakeApi(), ci_check=lambda s: True,
                   marker_reader=lambda s, a: marker, sdk="auto").startswith("skipped: nothing new")  # fmt: skip

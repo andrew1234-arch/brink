@@ -117,13 +117,13 @@ Gotchas:
 | GPU runs | **All six stages finished** on `results/all` (last: repair, 2026-11-14 16:48 UTC). Verdicts: go_nogo NO-GO (G2 only), pipeline DELIVERS (4 of 4), gate NOT PROVEN (D2: 8 points, needs 10), repair NOT PROVEN (R4: rollback + guard 41 % vs safety mix 23 %; halt 17 %), multilingual done (hi / tl false alarms on control), live done. The result files are also in `results/` on `main` |
 | Not in these runs | The `circuit` stage, chrF in the pipeline, and correctly scored AuditKIT numbers (the runs used AuditKIT's default detectors; don't quote `redteam_*` / "attacks resisted"). No adapters were published, and Kaggle deletes them when a session ends |
 | Write-up | Filled with the real numbers, negative verdicts included: `README.md`, `docs/SUBMISSION.md`, `docs/ABSTRACT.md` (under 500 words), `docs/ARTICLE.md` (follows the site's required write-up sections). `results/HEADLINES.md` traces each number |
-| HF Space | Hugging Face refuses a Gradio Space on free hardware without a PRO account (402). The deploy now falls back by itself to a free **static results page** (reports, plots, logs; no live tabs), and a Space deployed as static stays static. To deploy the Gradio app after getting PRO, the workflow must pass `HF_SPACE_SDK=gradio`: that edit, and a manual `publish-hub.yml` workflow, are on the local branch `with-workflows`, which needs a GitHub token with the `workflow` scope to push (`gh auth refresh -s workflow`) |
+| HF Space | **Deployed and public on 2026-11-15:** https://huggingface.co/spaces/cmgdevl/brink, as a static results page. Hugging Face refuses a Gradio Space on free hardware without a PRO account (402). The deploy now falls back by itself to a free **static results page** (reports, plots, logs; no live tabs), and a Space deployed as static stays static. To deploy the Gradio app after getting PRO, the workflow must pass `HF_SPACE_SDK=gradio`: that edit, and a manual `publish-hub.yml` workflow, are on the local branch `with-workflows`, which needs a GitHub token with the `workflow` scope to push (`gh auth refresh -s workflow`) |
 | Hub artifacts and collections | **Not published.** `scripts/publish_hub.py` needs an HF write token |
 | ROI | Not done: `configs/roi.yaml` needs real prices with sources, and the serving speed comes from a pipeline run on the merged code |
 | Kaggle GPU quota | 30 h / week, resets Fridays 00:00 UTC |
-| Repo About | Description and topics set on 2026-11-12. Website still to set once the Space is up |
+| Repo About | Description and topics set on 2026-11-12; Website set to the Space on 2026-11-15 |
 
-**Critical path:** push `main` → deploy the Space → publish the Hub collections → make the repo public → post the
+**Critical path:** publish the Hub collections → make the repo public → post the
 article → submit by Nov 15, 11:59 PM AoE.
 
 **Optional, about 2.5 h of Kaggle GPU:** one more session for `circuit` and a pipeline re-run (`RERUN =
