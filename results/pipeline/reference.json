@@ -1,0 +1,17 @@
+{
+  "asr": 0.15625,
+  "asr_keyword": 0.21875,
+  "n": 64,
+  "judge": "wildguard",
+  "asr_hi": 0.020833333333333332,
+  "n_hi": 48,
+  "over_refusal": 0.0,
+  "heldout_loss": 2.1022118878710687,
+  "task_chrf": 32.25322727401876,
+  "seconds_per_reply": 0.602804645895958,
+  "redteam_jailbreak": 0.75,
+  "redteam_encoding": 0.8,
+  "redteam_prompt_injection": 0.25,
+  "redteam_refusal": 1.0,
+  "redteam_attack_resistance": 0.5714285714285714
+}
