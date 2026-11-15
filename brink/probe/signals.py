@@ -16,8 +16,8 @@ from brink.utils import autocast, batched, format_prompt
 
 @dataclass
 class Collected:
-    acts: torch.Tensor  # [L+1, n, d] float32, last prompt token, every layer (0 = embeddings)
-    logp: torch.Tensor  # [n, V] full next-token log-probs, or [n, k] for selected token ids
+    acts: torch.Tensor
+    logp: torch.Tensor
 
 
 @torch.no_grad()
@@ -33,7 +33,6 @@ def collect(
     try:
         for chunk in batched(texts, batch_size):
             enc = tok(list(chunk), return_tensors="pt", padding=True, add_special_tokens=False).to(device)
-            # Left padding: positions must come from the mask, or padded rows get shifted positions.
             pos = (enc.attention_mask.cumsum(-1) - 1).clamp(min=0)
             kw = dict(
                 input_ids=enc.input_ids,
@@ -47,7 +46,7 @@ def collect(
                     out = model(**kw, logits_to_keep=1)
                 except TypeError:
                     out = model(**kw)
-            hs = torch.stack([h[:, -1, :] for h in out.hidden_states]).float()  # [L+1, b, d]
+            hs = torch.stack([h[:, -1, :] for h in out.hidden_states]).float()
             lp = F.log_softmax(out.logits[:, -1, :].float(), dim=-1)
             if not torch.isfinite(hs).all() or not torch.isfinite(lp).all():
                 raise FloatingPointError(
@@ -90,9 +89,9 @@ def compute_signals(
     if idx_b is not None:
         A_b, lp_b = A_b[:, idx_b], lp_b[idx_b]
 
-    proj_h = torch.einsum("lnd,ld->ln", A_h, directions)  # [L+1, n]
+    proj_h = torch.einsum("lnd,ld->ln", A_h, directions)
     proj_b = torch.einsum("lnd,ld->ln", A_b, directions)
-    margin = proj_h.mean(1) - proj_b.mean(1)  # [L+1]
+    margin = proj_h.mean(1) - proj_b.mean(1)
     cur = F.normalize(A_h[layer].mean(0) - A_b[layer].mean(0), dim=-1)
 
     sig = {
@@ -108,5 +107,4 @@ def compute_signals(
 
 
 SIGNALS = ["S1", "S1h", "S2", "S3", "S5"]
-# Signals that fall when safety drifts, so an alarm is z <= -threshold. S5 is a guard, not an alarm.
 ALARM_SIGNALS = ["S1", "S1h", "S2", "S3"]

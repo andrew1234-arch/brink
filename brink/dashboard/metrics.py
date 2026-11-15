@@ -19,7 +19,7 @@ SIGNAL_LABELS = {
 @dataclass
 class AlarmRule:
     signal: str = "S3"
-    method: str = "threshold"  # "threshold" | "cusum"
+    method: str = "threshold"
     threshold: float = -3.0
     persistence: int = 2
     cusum_k: float = 0.5

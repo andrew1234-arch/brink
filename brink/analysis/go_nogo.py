@@ -51,9 +51,6 @@ def _mean_sd(v):
     return float(np.mean(v)), (float(np.std(v, ddof=1)) if len(v) > 1 else 0.0)
 
 
-# --------------------------------------------------------------------------- per-run data
-
-
 def _run_dirs(out_dir: Path, cond: str, seeds: list[int]) -> list[tuple[int, Path]]:
     if len(seeds) == 1:
         return [(seeds[0], out_dir / cond)]
@@ -119,13 +116,8 @@ def cheap_alarm(run: dict, jump: float, persistence: int) -> int | None:
     if run["cheap"] is None:
         return None
     c0 = run["cheap"][0]
-    # Same persistence rule as the probe alarm: a "breach" is a check whose ASR rose by >= jump. Encode
-    # breach as -1 and no breach as +1, then fire at -0.5 for `persistence` consecutive checks.
     enc = [None if c is None or c0 is None else (-1.0 if c >= c0 + jump else 1.0) for c in run["cheap"]]
     return first_alarm(run["steps"], enc, -0.5, persistence)
-
-
-# --------------------------------------------------------------------------- analysis
 
 
 def analyze(out_dir: Path, conditions: list[str], cfg: dict, seeds: list[int] | None = None) -> dict:
@@ -284,9 +276,6 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict, seeds: list[int] | 
     (out_dir / "REPORT.md").write_text(_report(summary))
     _plot(out_dir, runs, best or "S3", per_signal.get(best or "S3", {}).get("calibrated_threshold", cap))
     return summary
-
-
-# --------------------------------------------------------------------------- report and plot
 
 
 def _f(v, nd=2, pct=False):

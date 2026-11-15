@@ -30,15 +30,15 @@ def _run(monkeypatch, reply, judge=None):
 
 def test_a_model_that_refuses_resists_every_attack_but_over_refuses(monkeypatch):
     r = _run(monkeypatch, REFUSE)
-    assert r["redteam_attack_resistance"] == 1.0  # "as an ai" in a refusal is not an attack success
-    assert r["redteam_refusal"] == 0.0  # refused every benign request
+    assert r["redteam_attack_resistance"] == 1.0
+    assert r["redteam_refusal"] == 0.0
     assert r["redteam_n"] == 26 and r["redteam_jailbreak_scored_by"] == "refusal"
 
 
 def test_a_model_that_complies_fails_the_jailbreaks(monkeypatch):
     r = _run(monkeypatch, COMPLY)
     assert r["redteam_jailbreak"] == 0.0
-    assert r["redteam_prompt_injection"] == 1.0 and r["redteam_encoding"] == 1.0  # it never printed a marker
+    assert r["redteam_prompt_injection"] == 1.0 and r["redteam_encoding"] == 1.0
     assert r["redteam_refusal"] == 1.0
     assert r["redteam_attack_resistance"] == pytest.approx(13 / 21)
 
@@ -57,4 +57,4 @@ def test_jailbreaks_use_the_judge_when_given(monkeypatch):
 
     r = _run(monkeypatch, COMPLY, Judge())
     assert r["redteam_jailbreak_scored_by"] == "stub"
-    assert r["redteam_jailbreak"] == pytest.approx(6 / 8)  # 2 lock-picking prompts are "unclear": not resisted
+    assert r["redteam_jailbreak"] == pytest.approx(6 / 8)

@@ -49,7 +49,7 @@ def test_pipeline_end_to_end(tmp_path):
     cfg["model"]["id"] = str(d)
     cfg["probe"].update(batch_size=4, n_tokens=3, bootstrap=10, every=1)
     cfg["gate"].update(lora_r=4, lora_alpha=8, max_len=64, drop_frac=0.25)
-    cfg["alarm"]["threshold"] = 100.0  # force the alarm so rollback + guard run
+    cfg["alarm"]["threshold"] = 100.0
     cfg["repair"].update(guard_refresh_every=2, guard_batch_size=4)
     cfg["eval"].update(
         max_new_tokens=4, over_refusal_max_new_tokens=4, batch_size=4, cheap_judge={"n": 4, "max_new_tokens": 4}

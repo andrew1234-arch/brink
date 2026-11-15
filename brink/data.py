@@ -14,7 +14,7 @@ import torch
 
 from brink.utils import format_conversation
 
-Pair = tuple[str, str]  # (user, assistant)
+Pair = tuple[str, str]
 
 
 @dataclass
@@ -24,7 +24,7 @@ class GoNoGoData:
     harmful_probe: list[str]
     harmless_probe: list[str]
     eval_harmful: list[str]
-    train: dict[str, list[Pair]]  # condition -> SFT pairs
+    train: dict[str, list[Pair]]
     sources: dict = field(default_factory=dict)
 
     def summary(self) -> dict:
@@ -37,9 +37,6 @@ class GoNoGoData:
             "train": {k: len(v) for k, v in self.train.items()},
             "sources": self.sources,
         }
-
-
-# --------------------------------------------------------------------------- de-duplication
 
 
 def _norm(s: str) -> list[str]:
@@ -60,9 +57,6 @@ def dedupe_against(items: list, refs: list[str], key=lambda x: x, jaccard: float
             continue
         out.append(it)
     return out
-
-
-# --------------------------------------------------------------------------- HF loading
 
 
 def _load(src: dict):
@@ -107,13 +101,11 @@ def core_sets(cfg: dict, rng: random.Random) -> dict:
     n_cal, n_probe, n_eval = cfg["n_cal"], cfg["n_probe"], cfg["n_eval"]
     sources = {}
 
-    # Harmful probe prompts (AdvBench): calibration + monitoring splits.
     harmful = load_harmful_prompts(cfg["harmful_probe_source"])
     rng.shuffle(harmful)
     harmful_cal, harmful_probe = harmful[:n_cal], harmful[n_cal : n_cal + n_probe]
     sources["harmful_probe"] = cfg["harmful_probe_source"]["name"]
 
-    # Behavioural eval prompts: HarmBench, falling back to unused AdvBench prompts.
     try:
         ev = load_harmful_prompts(cfg["eval_source"])
         ev = dedupe_against(ev, harmful_cal + harmful_probe)
@@ -125,7 +117,6 @@ def core_sets(cfg: dict, rng: random.Random) -> dict:
         eval_harmful = harmful[n_cal + n_probe : n_cal + n_probe + n_eval]
         sources["eval"] = cfg["harmful_probe_source"]["name"] + " (held-out)"
 
-    # Harmless prompts / benign SFT data (Alpaca, no-input rows).
     alpaca = load_alpaca_pairs(cfg["harmless_source"])
     rng.shuffle(alpaca)
     harmless_cal = [u for u, _ in alpaca[:n_cal]]
@@ -133,7 +124,6 @@ def core_sets(cfg: dict, rng: random.Random) -> dict:
     benign_pool = alpaca[n_cal + n_probe :]
     sources["harmless"] = cfg["harmless_source"]["name"]
 
-    # Harmful SFT data, de-duplicated against every probe / eval prompt.
     comply, refuse = load_harmful_pairs(cfg["harmful_train_source"])
     refs = harmful_cal + harmful_probe + eval_harmful
     comply = dedupe_against(comply, refs, key=lambda x: x[0])
@@ -161,9 +151,9 @@ def build_go_nogo_data(cfg: dict, seed: int) -> GoNoGoData:
     control = c["benign_pool"][: n_train - n_ref] + c["refuse"][:n_ref]
     rng.shuffle(control)
     train = {
-        "pos": c["comply"][:n_train],  # harmful compliance -> expected strong drift
-        "control": control,  # benign + refusals -> expected no drift
-        "benign": c["benign_pool"][:n_train],  # benign only -> expected mild drift
+        "pos": c["comply"][:n_train],
+        "control": control,
+        "benign": c["benign_pool"][:n_train],
     }
     return GoNoGoData(
         c["harmful_cal"],
@@ -185,10 +175,10 @@ class GateData:
     harmful_probe: list[str]
     harmless_probe: list[str]
     eval_harmful: list[str]
-    pool: list[dict]  # {"id", "user", "assistant", "source": "benign" | "planted"}
-    anchors_unsafe: list[Pair]  # harmful prompt + compliance (representation baseline)
-    anchors_safe: list[Pair]  # same kind of prompt + refusal
-    heldout_benign: list[Pair]  # capability check: loss on unseen benign data
+    pool: list[dict]
+    anchors_unsafe: list[Pair]
+    anchors_safe: list[Pair]
+    heldout_benign: list[Pair]
     sources: dict = field(default_factory=dict)
 
     def summary(self) -> dict:
@@ -218,7 +208,6 @@ def build_gate_data(cfg: dict, seed: int) -> GateData:
         {"id": f"p{i}", "user": u, "assistant": a, "source": "planted"} for i, (u, a) in enumerate(comply[:n_planted])
     ]
     rng.shuffle(pool)
-    # Anchors come from rows not used as planted samples.
     anchors_unsafe = comply[n_planted : n_planted + n_anchor]
     anchors_safe = refuse[n_planted : n_planted + n_anchor]
     return GateData(
@@ -233,9 +222,6 @@ def build_gate_data(cfg: dict, seed: int) -> GateData:
         held,
         c["sources"],
     )
-
-
-# --------------------------------------------------------------------------- SFT tokenization
 
 
 def template_overhead(tok) -> int:
@@ -287,10 +273,10 @@ class RepairData:
     harmless_probe: list[str]
     eval_harmful: list[str]
     train: list[Pair]
-    heldout_benign: list[Pair]  # capability: reply loss on unseen task data
-    harmless_eval: list[str]  # over-refusal: refusal rate on unseen harmless prompts
+    heldout_benign: list[Pair]
+    harmless_eval: list[str]
     sources: dict = field(default_factory=dict)
-    train_safety_mix: list[Pair] = field(default_factory=list)  # baseline: same data + refusal examples
+    train_safety_mix: list[Pair] = field(default_factory=list)
 
     def summary(self) -> dict:
         return {
@@ -314,8 +300,6 @@ def build_repair_data(cfg: dict, seed: int) -> RepairData:
     rest = benign[cfg["n_heldout"] + cfg["n_harmless_eval"] :]
     train = rest[: n_train - n_bad] + c["comply"][:n_bad]
     rng.shuffle(train)
-    # Safety-mix baseline (the standard cheap fix): the same contaminated set plus refusal examples whose
-    # prompts don't appear among the contaminating samples.
     bad_prompts = [u for u, _ in c["comply"][:n_bad]]
     refusals = dedupe_against(c["refuse"], bad_prompts, key=lambda x: x[0])[: cfg.get("n_safety_mix", 51)]
     mix = train + refusals
@@ -339,9 +323,6 @@ def build_repair_data(cfg: dict, seed: int) -> RepairData:
     )
 
 
-# --------------------------------------------------------------------------- multilingual (experiment 03)
-
-
 @dataclass
 class LangSets:
     harmful_cal: list[str]
@@ -353,7 +334,7 @@ class LangSets:
 
 @dataclass
 class MultilingualData:
-    langs: dict[str, LangSets]  # first key is the primary language (English)
+    langs: dict[str, LangSets]
     train: dict[str, list[Pair]]
     sources: dict = field(default_factory=dict)
 
@@ -427,9 +408,6 @@ def build_multilingual_data(cfg: dict, seed: int) -> MultilingualData:
     return MultilingualData(langs, {"pos": c["comply"][:n_train], "control": control}, sources)
 
 
-# --------------------------------------------------------------------------- pipeline use case (experiment 04)
-
-
 def load_aya_pairs(src: dict, languages: list[str]) -> list[Pair]:
     """(instruction, answer) pairs from the Aya instruction dataset, filtered by language."""
     from datasets import load_dataset
@@ -451,11 +429,11 @@ class PipelineData:
     harmless_cal: list[str]
     harmful_probe: list[str]
     harmless_probe: list[str]
-    eval_harmful: list[str]  # English HarmBench (main safety metric, reliable judge)
-    eval_harmful_hi: list[str]  # Hindi Aya red-teaming (judge less reliable, reported separately)
-    pool: list[dict]  # {"id", "user", "assistant", "source": "benign" | "planted"}
-    heldout: list[Pair]  # task skill: reply loss on unseen Hindi instructions
-    harmless_eval: list[str]  # over-refusal on unseen Hindi instructions
+    eval_harmful: list[str]
+    eval_harmful_hi: list[str]
+    pool: list[dict]
+    heldout: list[Pair]
+    harmless_eval: list[str]
     sources: dict = field(default_factory=dict)
 
     def summary(self) -> dict:

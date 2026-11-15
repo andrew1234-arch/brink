@@ -12,7 +12,6 @@ class Prober:
 
     def __init__(self, fp: SafetyFingerprint, tok, harmful: list[str], harmless: list[str], batch_size: int = 8):
         self.fp, self.tok, self.batch_size = fp, tok, batch_size
-        # Pre-format once; the chat template is fixed for the run.
         self.harmful = [format_prompt(tok, p) for p in harmful]
         self.harmless = [format_prompt(tok, p) for p in harmless]
 

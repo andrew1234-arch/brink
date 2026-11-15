@@ -93,15 +93,15 @@ def test_no_results_branch_deploys_demo_private(repo, tmp_path):
     settings = next(c for c in api.calls if c[0] == "settings")
     upload = next(c for c in api.calls if c[0] == "upload")
     assert create[2]["private"] is True and settings[2]["private"] is True
-    assert upload[2]["delete_patterns"] == ["*"]  # Space mirrors the build exactly
+    assert upload[2]["delete_patterns"] == ["*"]
 
 
 def test_partial_real_runs_are_not_mixed_with_demo(repo, tmp_path):
     clone, _, publish = repo
-    publish({"results/go_nogo/pos_s0/probe.csv": "step,z_S3\n0,0\n"})  # failed stage: no REPORT.md
+    publish({"results/go_nogo/pos_s0/probe.csv": "step,z_S3\n0,0\n"})
     status = _run(clone, tmp_path, FakeApi())
     assert status.startswith("deployed demo")
-    assert not (tmp_path / "space" / "results" / "go_nogo").exists()  # partial real run left out
+    assert not (tmp_path / "space" / "results" / "go_nogo").exists()
     assert (tmp_path / "space" / "results" / "simulated_gate").exists()
 
 
@@ -128,7 +128,7 @@ def test_git_failure_aborts_instead_of_deploying_demo(repo, tmp_path):
     api = FakeApi()
     with pytest.raises(DeployError):
         _run(clone, tmp_path, api)
-    assert "upload" not in api.kinds()  # real results are never overwritten
+    assert "upload" not in api.kinds()
 
 
 def test_untested_code_is_not_deployed(repo, tmp_path):
@@ -164,10 +164,10 @@ def test_gradio_pin_is_single_source():
     pin = gradio_pin()
     assert f"sdk_version: {pin}" in space_readme()
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
-    assert "-r app/requirements.txt" in ci  # CI tests the exact pinned version
+    assert "-r app/requirements.txt" in ci
     tomllib = pytest.importorskip("tomllib")
     extras = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["optional-dependencies"]
-    assert f"gradio=={pin}" in extras["dashboard"]  # `pip install .[dashboard]` gets the deployed version
+    assert f"gradio=={pin}" in extras["dashboard"]
 
 
 def _commit(clone, name):
@@ -180,7 +180,7 @@ def test_late_ci_on_an_older_commit_does_not_roll_back(repo, tmp_path):
     clone, _, _ = repo
     _commit(clone, "newer.txt")
     _git(clone, "push", "-q", "origin", "HEAD:main")
-    _git(clone, "checkout", "-q", "HEAD~1")  # CI for the older commit finishes after the newer one was pushed
+    _git(clone, "checkout", "-q", "HEAD~1")
     api = FakeApi()
     status = _run(clone, tmp_path, api)
     assert status.startswith("skipped:") and "no longer the tip of main" in status
@@ -193,7 +193,7 @@ def test_only_finished_stages_are_published(repo, tmp_path):
         {
             "results/gate/REPORT.md": "# gate",
             "results/gate/scores.csv": "id,score\n0,1\n",
-            "results/go_nogo/pos_s0/probe.csv": "step\n0\n",  # failed half-way: no REPORT.md
+            "results/go_nogo/pos_s0/probe.csv": "step\n0\n",
         }
     )
     assert _run(clone, tmp_path, FakeApi()).startswith("deployed real (1 finished")
@@ -210,11 +210,11 @@ def test_results_come_only_from_the_results_branch(repo, tmp_path):
     local = clone / "results" / "local_run"
     local.mkdir(parents=True)
     (local / "REPORT.md").write_text("# not from results/all")
-    assert _run(clone, tmp_path, FakeApi()).startswith("deployed demo")  # no branch: main's results/ ignored
+    assert _run(clone, tmp_path, FakeApi()).startswith("deployed demo")
     publish({"results/gate/REPORT.md": "# gate"})
     assert _run(clone, tmp_path, FakeApi()).startswith("deployed real")
     assert sorted(p.name for p in (tmp_path / "space" / "results").iterdir()) == ["gate"]
-    assert sorted(p.name for p in (clone / "results").iterdir()) == ["local_run"]  # checkout left untouched
+    assert sorted(p.name for p in (clone / "results").iterdir()) == ["local_run"]
 
 
 def test_schedule_decides_before_fetching(repo, tmp_path, monkeypatch):
@@ -249,9 +249,9 @@ def test_marker_reader_distinguishes_missing_from_errors(monkeypatch, capsys):
         cls = getattr(errors, name)
         exc = cls.__new__(cls)
         assert deployed_marker("me/brink", None) is None
-        assert seen["token"] == "hf_env"  # private Spaces need the token
+        assert seen["token"] == "hf_env"
         assert "::warning::" not in capsys.readouterr().out
-    exc = errors.LocalEntryNotFoundError("network down")  # a subclass of EntryNotFoundError: not "missing"
+    exc = errors.LocalEntryNotFoundError("network down")
     assert deployed_marker("me/brink", None) is None
     assert "::warning::" in capsys.readouterr().out
 
@@ -266,9 +266,9 @@ def test_missing_token_skips_quietly(monkeypatch, capsys):
 def test_deploy_workflow_guards():
     doc = yaml.safe_load((ROOT / ".github" / "workflows" / "deploy-space.yml").read_text())
     cond = doc["jobs"]["deploy"]["if"]
-    assert "workflow_run.event == 'push'" in cond  # never a fork's pull_request CI run
+    assert "workflow_run.event == 'push'" in cond
     assert "head_repository.full_name == github.repository" in cond
-    assert "workflow_dispatch" in doc["concurrency"]["group"]  # schedule can't replace a queued manual run
+    assert "workflow_dispatch" in doc["concurrency"]["group"]
 
 
 def test_workflows_do_not_interpolate_into_shell():
@@ -299,7 +299,7 @@ def test_static_deploy_is_a_results_page_without_app_or_secret(repo, tmp_path):
                     marker_reader=lambda s, a: None, space_token="hf_read", sdk="static")  # fmt: skip
     assert status.startswith("deployed real (1 finished experiment(s), static page)")
     assert api.calls[0][2]["space_sdk"] == "static"
-    assert "secret" not in api.kinds()  # a static page runs no code: no token on the Space
+    assert "secret" not in api.kinds()
     out = tmp_path / "space"
     assert (out / "index.html").exists() and not (out / "app.py").exists()
     assert json.loads((out / "DEPLOYED.json").read_text())["sdk"] == "static"
@@ -350,11 +350,11 @@ def test_auto_falls_back_to_static_on_the_paywall_and_stays_static(repo, tmp_pat
     assert "static page" in status and "secret" not in api.kinds()
     marker = json.loads((tmp_path / "space" / "DEPLOYED.json").read_text())
     assert marker["sdk"] == "static" and (tmp_path / "space" / "index.html").exists()
-    again = FakeApi()  # the Space is static now: never push the app over it, even if creating one would succeed
+    again = FakeApi()
     deploy(clone, "me/brink", True, "workflow_dispatch", tmp_path / "space", api=again, ci_check=lambda s: True,
            marker_reader=lambda s, a: marker, sdk="auto")  # fmt: skip
     assert again.calls[0][2]["space_sdk"] == "static"
-    unreadable = FakeApi()  # marker unreadable: the Space's own SDK decides
+    unreadable = FakeApi()
     unreadable.space_info = lambda sid: type("I", (), {"sdk": "static"})()
     deploy(clone, "me/brink", True, "workflow_dispatch", tmp_path / "space", api=unreadable, ci_check=lambda s: True,
            marker_reader=lambda s, a: None, sdk="auto")  # fmt: skip

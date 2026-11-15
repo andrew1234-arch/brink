@@ -1,5 +1,4 @@
-# The Space: dashboard, live runs and the data gate. CPU is enough; a GPU (t4-small) runs Tiny Aya live.
-gradio==6.31.0       # pinned: CI tests this exact version and the Space deploys it
+gradio==6.31.0
 plotly>=5
 numpy
 torch>=2.4

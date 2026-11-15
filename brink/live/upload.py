@@ -66,7 +66,7 @@ def fingerprint_for(model_id: str, cache_dir: Path, loader=None, data: LiveData 
 
     path = Path(cache_dir) / model_id.replace("/", "__") / "fingerprint"
     cfg = LiveConfig(model_id=model_id, seed=seed)
-    data = data or build_live_data(cfg)  # the probe prompts are needed either way
+    data = data or build_live_data(cfg)
     if path.with_suffix(".json").exists() and path.with_suffix(".pt").exists():
         return SafetyFingerprint.load(path), data
     model, tok = (loader or _loader(model_id))()
@@ -107,7 +107,7 @@ def gate_pairs(
     fp, data = fingerprint_for(model_id, cache_dir, loader, data)
     progress(0.15, "Loading the model")
     model, tok = loader()
-    max_len = sft_max_len(tok, max_len)  # a budget for the sample, on top of the chat template
+    max_len = sft_max_len(tok, max_len)
     ok = [i for i, p in enumerate(pairs) if tokenize_sft(tok, [p], max_len)]
     scorer = GateScorer(model, tok, fp, data.harmful_probe, data.harmless_probe, ("S3",), max_len=max_len, batch_size=2)
     scores = np.full(len(pairs), np.nan)
@@ -117,7 +117,7 @@ def gate_pairs(
     del scorer, model
     release_gpu()
     filled = np.where(np.isnan(scores), -np.inf, scores)
-    drop, dup, _ = gate_with_curatorkit(pairs, filled, drop_frac)  # CuratorKIT: dedup → BrinkSafetyGate
+    drop, dup, _ = gate_with_curatorkit(pairs, filled, drop_frac)
     order = np.argsort(-filled, kind="stable")
     return [
         {

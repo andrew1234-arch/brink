@@ -42,16 +42,12 @@ def run(cfg: dict, out_dir: Path, data: GoNoGoData | None = None, loader=None, j
     print(f"[data] {data.summary()}", flush=True)
     judge = judge or make_judge(cfg["judge"])
 
-    # 1. Calibrate the fingerprint on the reference model (once).
     fp = calibrate_or_load(out_dir, loader, data, cfg["probe"], seed)
 
-    # 2. One fine-tuning run per condition, monitored and evaluated along the way.
-    # Every condition under every seed (seed = LoRA init + data order; data and fingerprint are shared).
     for s in seeds_of(cfg):
         for cond in cfg["conditions"]:
             run_condition(run_name(cond, s, cfg), data.train[cond], out_dir, fp, loader, data, judge, cfg, s)
 
-    # 3. Verdict.
     summary = analyze(out_dir, cfg["conditions"], cfg["analysis"], seeds_of(cfg))
     summary["wall_minutes"] = round((time.time() - t_start) / 60, 1)
     write_json(out_dir / "summary.json", summary)

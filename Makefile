@@ -1,4 +1,3 @@
-# Common tasks. Python and pip are whatever is on PATH (use a virtual environment).
 PY ?= python
 
 .PHONY: help install install-all lint format test app demo live space run-all dry-run

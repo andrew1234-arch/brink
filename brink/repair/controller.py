@@ -67,12 +67,10 @@ class RepairController:
 
     def _reset_optimizer(self) -> None:
         if self.optimizer is not None:
-            self.optimizer.state.clear()  # Adam moments re-initialise lazily
+            self.optimizer.state.clear()
 
     def on_step(self, model, step: int) -> str | None:
         row = self.monitor(model, step)
-        # Step 0 is the reference model (LoRA B = 0): always a valid rollback floor. After that, only states the
-        # monitor considered safe are kept.
         if step == 0 or (row is not None and not row.get("breach") and self.monitor.alarm_step is None):
             self.snapshots.save(step, model)
         fired = bool(row and row.get("alarm_fired"))
@@ -86,7 +84,7 @@ class RepairController:
             self._reset_optimizer()
             self.rolled_back_to = back
             self.monitor.log_event(step, "rollback", f"restored LoRA weights from step {back}")
-            self.monitor(model, step, force_probe=True)  # confirm the restored state
+            self.monitor(model, step, force_probe=True)
         if fired and self.policy in ("guard", "rollback_guard"):
             self.guard.active = True
             self.monitor.log_event(step, "guard_on", f"erosion guard on (target {self.guard.target})")

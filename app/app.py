@@ -32,7 +32,7 @@ import gradio as gr
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(Path(__file__).resolve().parent))  # live_tab sits next to this file (also on the Space)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from live_tab import LIVE_CSS, build_gate_tab, build_live_tab
 
@@ -63,7 +63,7 @@ CSS = """
 .brink-banner b { font-weight: 650; }
 """
 CSS += LIVE_CSS
-MAX_UPLOAD = "10mb"  # "Gate your data" uploads
+MAX_UPLOAD = "10mb"
 
 STATUS_STYLE = {
     "alarm": ("critical", "!", "ALARM"),
@@ -200,7 +200,7 @@ def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
             "<p>Gates risky training data, watches the model's refusals during fine-tuning, raises "
             "the alarm as they slip and repairs the damage.</p></div>"
         )
-        dark = gr.Checkbox(False, label="Dark mode", render=False)  # shown at the bottom, used by every tab
+        dark = gr.Checkbox(False, label="Dark mode", render=False)
         dark.change(None, dark, None, js="(d) => { document.body.classList.toggle('dark', d); }")
         with gr.Tab("Run Brink"):
             build_live_tab(results_root, dark)
@@ -222,12 +222,11 @@ def experiments_tab(results_root: Path, label_root: Path, dark: gr.Checkbox) -> 
             r = load_run(p)
             rel = p.relative_to(label_root) if p != label_root and label_root in p.parents else Path(p.name)
             out.append((f"{rel} · {r.kind}" + (" · simulated" if r.simulated else ""), str(p), r.kind))
-        order = {"live": 0, "go_nogo": 1}  # end-to-end runs first, then go / no-go
+        order = {"live": 0, "go_nogo": 1}
         out.sort(key=lambda x: (order.get(x[2], 2), x[0]))
         return [(label, path) for label, path, _ in out]
 
     def pick_condition(run: Run) -> str | None:
-        # Multi-seed runs are named pos_s0, pos_s1, ...: match on the base name.
         for pref in CONDITION_PREF:
             for c in sorted(run.conditions):
                 if c == pref or re.fullmatch(rf"{pref}_s\d+", c):
@@ -317,7 +316,7 @@ def experiments_tab(results_root: Path, label_root: Path, dark: gr.Checkbox) -> 
                 headers=EVAL_HEADERS, label="Behavioural evals, selected condition", interactive=False
             )
         with gr.Tab("Reports"):
-            gr.Markdown(stage_reports(results_root))  # every stage's verdict, incl. CircuitKIT and ROI
+            gr.Markdown(stage_reports(results_root))
     timer = gr.Timer(5, active=False)
 
     inputs = [run_dd, cond_dd, signal, method, thr, persist, dark]

@@ -165,7 +165,7 @@ def test_controller_policies(setup, tmp_path, policy):
     }
     lora_sft(model, tok, tokenize_sft(tok, data.train["pos"], 64), cfg, 0, controller=ctl)
     s = ctl.summary()
-    assert s["alarm_step"] == 2  # probes at 0 and 2 both breach the +100 threshold
+    assert s["alarm_step"] == 2
     events = (tmp_path / policy / "events.csv").read_text()
     assert "alarm" in events
     if policy == "halt":
@@ -204,7 +204,7 @@ def test_reference_steer_restores_projection(setup):
         model(**enc)
         with ReferenceSteer(model, fp, strength=0.5):
             model(**enc)
-        model(**enc)  # hooks removed afterwards
+        model(**enc)
     handle.remove()
     h0, h1, h2 = (x @ r for x in seen)
     assert torch.allclose(h1 - h0, torch.full_like(h0, 0.5), atol=1e-4)
@@ -222,9 +222,9 @@ def test_resta_adds_scaled_safety_vector(setup, tmp_path):
     torch.manual_seed(1)
     with torch.no_grad():
         for p in base.parameters():
-            p.add_(0.01 * torch.randn_like(p))  # safety vector = aligned - base = -noise
+            p.add_(0.01 * torch.randn_like(p))
         for p in ft.parameters():
-            p.add_(0.02 * torch.randn_like(p))  # the "drift"
+            p.add_(0.02 * torch.randn_like(p))
     expected = {
         k: v.clone() + 0.25 * (aligned.state_dict()[k] - base.state_dict()[k]) for k, v in ft.state_dict().items()
     }
@@ -243,7 +243,7 @@ def test_repair_experiment_end_to_end(tmp_path):
     from experiments.repair import run
 
     d = tiny_model_dir(tmp_path)
-    base_dir = tmp_path / "tiny_base"  # stand-in "pre-alignment" base for ReSta
+    base_dir = tmp_path / "tiny_base"
     base = AutoModelForCausalLM.from_pretrained(str(d))
     torch.manual_seed(3)
     with torch.no_grad():
@@ -266,7 +266,7 @@ def test_repair_experiment_end_to_end(tmp_path):
     cfg = yaml.safe_load((ROOT / "configs" / "repair.yaml").read_text())
     cfg["model"]["id"] = str(d)
     cfg["probe"].update(batch_size=4, n_tokens=3, bootstrap=10, every=2)
-    cfg["alarm"]["threshold"] = 100.0  # force the alarm so every policy acts
+    cfg["alarm"]["threshold"] = 100.0
     cfg["repair"].update(guard_refresh_every=2, guard_batch_size=4)
     cfg["repair"]["resta"]["base_id"] = str(base_dir)
     cfg["eval"].update(steps=[0, 3, 6], max_new_tokens=4, over_refusal_max_new_tokens=4, batch_size=4)

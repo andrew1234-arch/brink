@@ -47,7 +47,6 @@ class BrinkCallback(TrainerCallback):
         return control
 
     def on_pre_optimizer_step(self, args, state, control, model=None, optimizer=None, **kwargs):
-        # Runs after gradient clipping, right before optimizer.step(): where the erosion guard projects.
         if self.controller is not None and model is not None:
             self._attach(model, optimizer)
             self.controller.after_backward(model, state.global_step + 1)

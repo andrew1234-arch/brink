@@ -31,7 +31,7 @@ def test_space_build_excludes_sensitive_files(tmp_path):
     out = build(tmp_path / "space", _fake_results(tmp_path), demo=False)
     names = {p.name for p in out.rglob("*") if p.is_file()}
     assert {"app.py", "dashboard.py", "live_tab.py", "README.md", "requirements.txt", "evals.csv", "REPORT.md"} <= names
-    assert (out / "examples" / "finetune_sample.jsonl").exists()  # the "Gate your data" example
+    assert (out / "examples" / "finetune_sample.jsonl").exists()
     assert not names & {"generations.jsonl", "adapter_model.safetensors", "adapter_config.json", "fingerprint.pt"}
     assert not (out / "results" / "simulated_go_nogo").exists()
     assert "sdk: gradio" in (out / "README.md").read_text()
@@ -61,7 +61,7 @@ def test_hub_staging_policy(tmp_path):
     files = collect(_fake_results(tmp_path), stage, ["rollback_guard"])
     assert "fingerprints/repair/fingerprint.pt" in files
     assert any(f.startswith("adapters/repair/rollback_guard/") for f in files)
-    assert not any("/none/adapter" in f for f in files)  # drifted adapter never published
+    assert not any("/none/adapter" in f for f in files)
     assert not any(f.endswith("generations.jsonl") for f in files)
 
 
@@ -95,7 +95,7 @@ def test_pipeline_layout_and_work_dir(tmp_path):
     (r / "_work" / "pipeline" / "manifest.json").write_text("{}")
     files = collect(r, tmp_path / "stage", ["brink"])
     assert any("adapters/brink/" in f for f in files)
-    assert not any("/naive/" in f for f in files)  # the unprotected pipeline model stays private
+    assert not any("/naive/" in f for f in files)
     assert not any(f.endswith(("raw.jsonl", "manifest.json")) for f in files)
 
 
@@ -129,7 +129,7 @@ def test_static_space_is_one_page_of_the_finished_reports(tmp_path):
     page = (out / "index.html").read_text()
     assert "<strong>DONE</strong>" in page and "<td>1</td>" in page and "<li>one</li>" in page
     assert 'src="results/repair/repair.png"' in page
-    assert "<script>" not in page and "SIMULATED" not in page  # report text is escaped
+    assert "<script>" not in page and "SIMULATED" not in page
 
 
 def test_static_demo_space_says_it_is_simulated(tmp_path):

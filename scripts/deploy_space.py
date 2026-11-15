@@ -58,7 +58,7 @@ def git(repo: Path, *args: str, text: bool = True) -> subprocess.CompletedProces
 def remote_sha(repo: Path, branch: str) -> str | None:
     """SHA of `branch` on origin, None if the branch doesn't exist. Raises on any other failure."""
     r = git(repo, "ls-remote", "--exit-code", "origin", f"refs/heads/{branch}")
-    if r.returncode == 2:  # --exit-code: 2 = no matching ref
+    if r.returncode == 2:
         return None
     if r.returncode != 0 or not r.stdout.strip():
         raise DeployError(f"could not query {branch}: {(r.stderr or r.stdout).strip()}")
@@ -86,7 +86,7 @@ def fetch_results(repo: Path, dest: Path) -> tuple[str, Path | None]:
         raise DeployError(f"could not extract results: {archive.stderr.decode(errors='replace').strip()}")
     with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
         if hasattr(tarfile, "data_filter"):
-            tar.extractall(dest, filter="data")  # no absolute paths, links out of dest or device files
+            tar.extractall(dest, filter="data")
         else:  # pragma: no cover - Python < 3.10.12
             tar.extractall(dest)
     return sha, dest / "results"
@@ -116,7 +116,7 @@ def deployed_marker(space_id: str, api) -> dict | None:
         getattr(hf_errors, n)
         for n in ("RemoteEntryNotFoundError", "RepositoryNotFoundError", "RevisionNotFoundError")
         if hasattr(hf_errors, n)
-    )  # not EntryNotFoundError: its subclass LocalEntryNotFoundError means "network failed"
+    )
     token = getattr(api, "token", None) or os.environ.get("HF_TOKEN") or None
     try:
         path = hf_hub_download(space_id, MARKER, repo_type="space", token=token, force_download=True)
@@ -151,10 +151,10 @@ def deploy(
 ) -> str:
     code = git(repo, "rev-parse", "HEAD").stdout.strip()
     auto, last = sdk == "auto", None
-    if auto:  # keep what the Space already is; a new Space tries the app first
+    if auto:
         last = marker_reader(space_id, api) or {}
         sdk = "static" if (last.get("sdk") or live_sdk(space_id, api)) == "static" else "gradio"
-    if event == "workflow_run":  # CI passed for `code`; deploy it only if nothing newer reached main since
+    if event == "workflow_run":
         tip = remote_sha(repo, "main")
         if tip != code:
             return f"skipped: {code[:7]} is no longer the tip of main ({(tip or 'missing')[:7]}); its own run deploys"
@@ -165,7 +165,7 @@ def deploy(
     if event == "schedule":
         last = last if last is not None else marker_reader(space_id, api) or {}
         if (last.get("code_sha"), last.get("results_sha"), last.get("sdk", "gradio")) == (code, rsha, sdk):
-            set_visibility(api, space_id, public)  # the only setting that can change without a new commit
+            set_visibility(api, space_id, public)
             return "skipped: nothing new since the last deploy"
 
     with tempfile.TemporaryDirectory(prefix="brink-results-") as tmp:
@@ -195,7 +195,7 @@ def deploy(
                     "Hugging Face refused to create the Gradio Space (402 Payment Required): on free hardware it "
                     "needs a PRO account. Set HF_SPACE_SDK to 'static' to deploy the free results page instead."
                 ) from e
-    if space_token and sdk == "gradio":  # a static page runs no code, so it needs no token
+    if space_token and sdk == "gradio":
         api.add_space_secret(space_id, "HF_TOKEN", space_token, description="read token for gated datasets")
     return f"deployed {mode} ({what}{', static page' if sdk == 'static' else ''}) at {code[:7]}"
 

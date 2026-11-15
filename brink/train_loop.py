@@ -50,7 +50,7 @@ def lora_sft(
         task_type="CAUSAL_LM",
     )
     model = get_peft_model(model, lcfg)
-    for p in model.parameters():  # LoRA params in fp32 for stable fp16 AMP
+    for p in model.parameters():
         if p.requires_grad:
             p.data = p.data.float()
 
@@ -76,7 +76,7 @@ def lora_sft(
         return {k: v.to(device) for k, v in b.items()}
 
     model.train()
-    if on_step and on_step(model, 0) == "stop":  # step 0: LoRA B = 0, so this is the reference model
+    if on_step and on_step(model, 0) == "stop":
         return model
     for step in range(1, cfg["max_steps"] + 1):
         t0 = time.time()

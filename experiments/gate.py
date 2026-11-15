@@ -100,7 +100,6 @@ def score_pool(out_dir: Path, data: GateData, fp, loader, gc: dict, seed: int, j
     log = CsvLog(path)
     for i, r in enumerate(data.pool):
         log.write({"id": r["id"], "source": r["source"], **{k: float(v[i]) for k, v in s.items()}})
-    # Texts go to a git-ignored file: planted samples contain harmful content.
     write_jsonl(out_dir / "pool.jsonl", data.pool, mode="w")
     del model, scorer
     release_gpu()

@@ -6,9 +6,9 @@ import os
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
-GPU_MODEL = "CohereLabs/tiny-aya-global"  # the model every experiment uses (3.35B, needs a GPU)
-CPU_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"  # small instruct model with real refusals, for CPU-only machines
-REPAIR_POLICIES = ("log", "halt", "rollback", "guard", "rollback_guard", "guard_always")  # = brink.repair.POLICIES
+GPU_MODEL = "CohereLabs/tiny-aya-global"
+CPU_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
+REPAIR_POLICIES = ("log", "halt", "rollback", "guard", "rollback_guard", "guard_always")
 STAGES = ["data", "fingerprint", "gate", "unprotected", "brink", "verify"]
 STAGE_TITLES = {
     "data": "Load data",
@@ -74,18 +74,18 @@ def check_model(model_id: str) -> str:
 @dataclass
 class LiveConfig:
     model_id: str = ""
-    contamination: float = 0.25  # share of harmful-compliance samples in the fine-tuning data
+    contamination: float = 0.25
     n_train: int = 96
     max_steps: int = 40
-    gate_drop_frac: float = 0.25  # the gate drops this share of the highest-risk samples
-    policy: str = "rollback_guard"  # what Brink does on alarm (brink.repair.POLICIES)
+    gate_drop_frac: float = 0.25
+    policy: str = "rollback_guard"
     alarm_threshold: float = -3.0
     alarm_persistence: int = 2
     probe_every: int = 4
     lr: float = 2e-4
     micro_batch: int = 2
     grad_accum: int = 2
-    max_len: int = 256  # tokens for the sample itself, on top of the chat template (Tiny Aya's is long)
+    max_len: int = 256
     lora_r: int = 8
     n_cal: int = 32
     n_probe: int = 32
@@ -97,8 +97,8 @@ class LiveConfig:
     bootstrap: int = 100
     n_tokens: int = 10
     guard_refresh_every: int = 8
-    redteam: bool = True  # AuditKIT red-team probes on the base, unprotected and Brink models (if installed)
-    task_quality: bool = True  # chrF of task replies vs references on the held-out task data
+    redteam: bool = True
+    task_quality: bool = True
     seed: int = 0
     sources: dict = field(default_factory=lambda: dict(SOURCES))
 

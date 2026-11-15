@@ -27,13 +27,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-judge = ["bitsandbytes", "accelerate"]          # WildGuard judge in 4-bit
-curatorkit = ["curatorkit"]                       # BrinkSafetyGate inside CuratorKIT pipelines
-safetune = ["safetune"]                           # post-hoc baselines (needs Python >= 3.12)
-auditkit = ["auditkit"]                           # red-team probes
-# AlignTune: install with `pip install --no-deps aligntune "trl==1.7.1" pypdf python-docx`
-# (its PyICU dependency needs system ICU; see docs/UPSTREAM.md).
-dashboard = ["gradio==6.31.0", "plotly>=5"]       # same pin as app/requirements.txt (tested)
+judge = ["bitsandbytes", "accelerate"]
+curatorkit = ["curatorkit"]
+safetune = ["safetune"]
+auditkit = ["auditkit"]
+dashboard = ["gradio==6.31.0", "plotly>=5"]
 dev = ["pytest", "ruff"]
 
 [project.urls]
@@ -49,21 +47,19 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "W", "B", "I", "UP", "SIM", "RUF"]
 ignore = [
-    "B905",     # zip() without strict=: lengths are checked where it matters
-    "RUF001",   # ×, – and other typographic characters in report strings are intentional
+    "B905",
+    "RUF001",
     "RUF002",
     "RUF003",
-    "RUF005",   # list concatenation reads better than unpacking here
-    "SIM105",   # explicit try/except/pass is clearer in the few places it's used
+    "RUF005",
+    "SIM105",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Entry points add the repo root to sys.path before importing the package.
 "experiments/*" = ["E402"]
 "tests/*" = ["E402"]
 "app/*" = ["E402"]
 "scripts/*" = ["E402"]
-# Kaggle notebooks: `_exit_code` comes from IPython's `!` magic; cells favour short, linear code.
 "notebooks/*" = ["F821", "E501", "SIM102", "SIM115"]
 
 [tool.ruff.lint.isort]

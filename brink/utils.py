@@ -9,8 +9,6 @@ from collections.abc import Iterator, Sequence
 import numpy as np
 import torch
 
-# --------------------------------------------------------------------------- reproducibility
-
 
 def set_seed(seed: int) -> None:
     random.seed(seed)
@@ -18,9 +16,6 @@ def set_seed(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-
-
-# --------------------------------------------------------------------------- precision
 
 
 def amp_dtype(device: torch.device) -> torch.dtype | None:
@@ -45,9 +40,6 @@ def autocast(device: torch.device):
             yield
 
 
-# --------------------------------------------------------------------------- loading
-
-
 def load_model_and_tokenizer(
     model_id: str, device: torch.device, dtype: torch.dtype | None = None, trust_remote_code: bool = False
 ):
@@ -60,15 +52,12 @@ def load_model_and_tokenizer(
     tok.padding_side = "left"
     try:
         model = AutoModelForCausalLM.from_pretrained(model_id, dtype=dtype, trust_remote_code=trust_remote_code)
-    except TypeError:  # older transformers
+    except TypeError:
         model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=dtype, trust_remote_code=trust_remote_code)
     if next(model.parameters()).dtype != dtype:
         model = model.to(dtype)
     model.to(device).eval()
     return model, tok
-
-
-# --------------------------------------------------------------------------- chat formatting
 
 
 def _messages(user: str, system: str | None) -> list[dict]:
@@ -92,14 +81,9 @@ def format_conversation(tok, user: str, assistant: str, system: str | None = Non
     return prompt, assistant + (tok.eos_token or "")
 
 
-# --------------------------------------------------------------------------- iteration
-
-
 def batched(items: Sequence, n: int) -> Iterator[Sequence]:
     for i in range(0, len(items), n):
         yield items[i : i + n]
 
-
-# --------------------------------------------------------------------------- logging (torch-free, re-exported)
 
 from brink.io import CsvLog, read_csv, write_json, write_jsonl  # noqa: E402,F401

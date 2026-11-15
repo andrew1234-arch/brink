@@ -131,8 +131,6 @@ def train_condition(name: str, out_dir: Path, fp, loader, data: RepairData, judg
     summary = {**ctl.summary(), "train_seconds": round(time.time() - t0, 1)}
     write_json(cdir / "repair.json", summary)
     final_redteam(model, tok, cdir, cfg, judge)
-    # Adapters stay local (git-ignored). `none` is the drifted model the post-hoc conditions repair; the
-    # Brink-protected ones can be published with scripts/publish_hub.py --adapters <condition>.
     model.save_pretrained(str(cdir / "adapter"))
     (cdir / "DONE").write_text("ok\n")
     del model, monitor, prober, ctl, guard

@@ -88,7 +88,6 @@ def collect(results: Path, stage: Path, adapters: list[str]) -> list[str]:
         if f.name.startswith("fingerprint") and f.suffix in (".pt", ".json"):
             dst = stage / "fingerprints" / rel
         elif "adapter" in parts or "adapters" in parts:
-            # repair layout: <exp>/<cond>/adapter/...   pipeline layout: _work/<exp>/adapters/<cond>/...
             cond = (
                 rel.parts[rel.parts.index("adapter") - 1]
                 if "adapter" in parts
@@ -98,7 +97,7 @@ def collect(results: Path, stage: Path, adapters: list[str]) -> list[str]:
                 continue
             dst = stage / "adapters" / rel
         elif "_work" in parts:
-            continue  # curated data, trainer outputs: never published
+            continue
         elif f.suffix in ALLOWED:
             dst = stage / "results" / rel
         else:

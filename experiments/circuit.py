@@ -73,7 +73,6 @@ def run(cfg: dict, out: Path) -> dict:
     write_json(out / "config.json", cfg)
     set_seed(cfg.get("seed", 0))
     t0 = time.time()
-    # The JSON half of the fingerprint is enough here (and it's what Kaggle sessions carry over; .pt files aren't).
     fp = json.loads((ROOT / cfg["fingerprint"]).with_suffix(".json").read_text())
     tok = AutoTokenizer.from_pretrained(cfg["model_id"])
     refusal, compliance = tok.decode([fp["refusal_ids"][0]]), tok.decode([fp["compliance_ids"][0]])
@@ -93,7 +92,7 @@ def run(cfg: dict, out: Path) -> dict:
         ig_steps=cfg.get("ig_steps", 5),
     )
     n_layers = int(model.cfg.n_layers)
-    for f in out.glob("*_scores.json"):  # CircuitKIT's own artifact (SafeTune-readable safety_units)
+    for f in out.glob("*_scores.json"):
         shutil.copy2(f, out / "circuit_scores.json")
     if not (out / "circuit_scores.json").exists():
         (out / "circuit_scores.json").write_text(json.dumps({"node_scores": circuit.scores}, indent=1))

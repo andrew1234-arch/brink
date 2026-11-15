@@ -26,7 +26,7 @@ def config(path: Path, model: str | None = None) -> tuple[LiveConfig, str]:
     raw = yaml.safe_load(Path(path).read_text())
     if model:
         raw["model_id"] = model
-    if raw.get("alarm_threshold", "auto") == "auto":  # Tiny Aya's calibration applies to Tiny Aya only
+    if raw.get("alarm_threshold", "auto") == "auto":
         raw["alarm_threshold"], source = alarm_threshold_for(raw["model_id"], ROOT / "results/go_nogo/summary.json")
         print(f"[alarm] threshold {raw['alarm_threshold']:.2f}: {source}", flush=True)
     return LiveConfig.from_dict(raw), raw.get("judge", "auto")

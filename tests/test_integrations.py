@@ -105,7 +105,7 @@ def test_monitor_only(setup, tmp_path):
 def test_policies_under_hf_trainer(setup, tmp_path, policy):
     d, data, fp = setup
     _, tok = load_model_and_tokenizer(str(d), torch.device("cpu"))
-    mon = _monitor(fp, tok, data, tmp_path / policy, 100.0)  # +100: alarm fires at the 2nd probe
+    mon = _monitor(fp, tok, data, tmp_path / policy, 100.0)
     guard = ErosionGuard(tok, fp, data.harmful_probe, data.harmless_probe, "S3", refresh_every=2, batch_size=4)
     ctl = RepairController(mon, policy, guard=guard if "guard" in policy else None)
     tr, _ = _trainer(d, data, tmp_path / "t", BrinkCallback(controller=ctl))
@@ -116,11 +116,11 @@ def test_policies_under_hf_trainer(setup, tmp_path, policy):
         assert tr.state.global_step == 2 and s["halted_at"] == 2
     else:
         assert tr.state.global_step == 6 and s["rolled_back_to"] == 0
-        assert s["guard"]["steps"] == 4  # steps 3..6 ran under the guard
+        assert s["guard"]["steps"] == 4
 
 
 def test_attach_to_aligntune():
-    class FakeAlignTune:  # AlignTune's TRL trainers expose this method
+    class FakeAlignTune:
         def get_hf_callbacks(self):
             return ["aligntune_adapter"]
 

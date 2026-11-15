@@ -1,8 +1,5 @@
-# Experiment 04: Brink in the full Lexsi pipeline on a real use case (Hindi assistant, contaminated data).
-# CuratorKIT (dedup + BrinkSafetyGate) -> AlignTune SFT with Brink attached -> WildGuard / AuditKIT evaluation.
-# About 1.5 h on Kaggle "GPU T4 x2".
 seed: 0
-trainer: aligntune          # aligntune | brink (falls back to brink's loop if AlignTune can't be imported)
+trainer: aligntune
 
 model:
   id: CohereLabs/tiny-aya-global
@@ -21,11 +18,11 @@ data:
   use_case:
     languages: [Hindi, hin]
     redteam_file: aya_hin.jsonl
-    n_train: 512           # Hindi instruction pairs in the fine-tuning set ...
-    n_harmful: 51          #   ... of which ~10 % harmful-compliance samples slipped in
-    n_heldout: 64          # task skill: reply loss on unseen Hindi instructions
-    n_harmless_eval: 32    # over-refusal on unseen Hindi instructions
-    n_eval_hi: 48          # Hindi harmful prompts (Aya red-teaming)
+    n_train: 512
+    n_harmful: 51
+    n_heldout: 64
+    n_harmless_eval: 32
+    n_eval_hi: 48
 
 probe:
   batch_size: 8
@@ -39,12 +36,12 @@ gate:
   lora_r: 8
   lora_alpha: 16
   max_len: 1024
-  batch_size: 1            # one sample per backward pass: keeps Tiny Aya's large-vocabulary logits small on a T4
-  drop_frac: 0.05          # a practitioner doesn't know the contamination rate: drop the riskiest 5 %
+  batch_size: 1
+  drop_frac: 0.05
 
 alarm:
   signal: S3
-  threshold: auto          # control-calibrated value from results/go_nogo/summary.json (falls back to -3)
+  threshold: auto
   calibration_from: results/go_nogo/summary.json
   persistence: 2
 
@@ -58,7 +55,7 @@ eval:
   over_refusal_max_new_tokens: 64
   batch_size: 16
   loss_batch_size: 2
-  task_chrf_max_new_tokens: 128   # task quality: chrF of replies vs references on the held-out Hindi set (0 = off)
+  task_chrf_max_new_tokens: 128
   redteam: true
   cheap_judge: {n: 16, max_new_tokens: 32, batch_size: 16}
 
@@ -71,11 +68,11 @@ judge:
 
 train:
   max_steps: 128
-  num_epochs: 100          # max_steps wins
+  num_epochs: 100
   lr: 1.0e-4
   warmup_steps: 4
-  micro_batch: 1  # Tiny Aya's vocabulary is large: keep each batch's logits small on a T4
-  grad_accum: 8            # same effective batch (8) as go / no-go
+  micro_batch: 1
+  grad_accum: 8
   max_len: 1024
   lora_r: 16
   lora_alpha: 32

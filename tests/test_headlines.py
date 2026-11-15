@@ -38,13 +38,13 @@ def _results(tmp_path: Path) -> Path:
 
 def test_collect_traces_every_number(tmp_path):
     found = collect(_results(tmp_path))
-    assert found["go_nogo.lead_mean"]["text"] == "12.5"  # the mechanistic signal is preferred
+    assert found["go_nogo.lead_mean"]["text"] == "12.5"
     assert found["go_nogo.false_alarm_rate"]["text"] == "0 %"
     assert found["go_nogo.judge_cost_ratio"]["text"] == "10"
     assert found["pipeline.asr_brink"]["text"] == "5 %"
     assert found["pipeline.chrf_brink"]["text"] == "41.3"
     assert "results/go_nogo/summary.json" in found["go_nogo.lead_mean"]["source"]
-    assert "gate.auroc" not in found and "pipeline.asr_naive" not in found  # never invented
+    assert "gate.auroc" not in found and "pipeline.asr_naive" not in found
     assert set(found) <= set(SPEC)
     assert "| `gate.auroc` | — | not yet |" in headlines_md(found)
 

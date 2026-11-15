@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 
 REPO_URL = "https://github.com/andrew1234-arch/brink"
-ORDER = ["live", "pipeline", "go_nogo", "gate", "repair", "multilingual", "circuit"]  # the product first
+ORDER = ["live", "pipeline", "go_nogo", "gate", "repair", "multilingual", "circuit"]
 TITLES = {
     "live": "Brink end to end (recorded live run)",
     "pipeline": "Pipeline: a Hindi assistant, before and after",
@@ -96,7 +96,7 @@ def markdown_to_html(md: str, shift: int = 0) -> str:
             while i < len(lines) and (re.match(r"\s*[-*]\s+", lines[i]) or (items and lines[i].startswith("  "))):
                 if re.match(r"\s*[-*]\s+", lines[i]):
                     items.append(re.sub(r"^\s*[-*]\s+", "", lines[i].rstrip()))
-                else:  # a wrapped line of the item above
+                else:
                     items[-1] += " " + lines[i].strip()
                 i += 1
             out.append("<ul>" + "".join(f"<li>{_inline(x)}</li>" for x in items) + "</ul>")

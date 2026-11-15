@@ -68,7 +68,6 @@ def run(cfg: dict, out_dir: Path, data: MultilingualData | None = None, loader=N
     fps = calibrate_languages(model, tok, data.langs, cfg["probe"], seed, out_dir)
     del model
     release_gpu()
-    # Primary fingerprint also as `fingerprint.*` so the dashboard recognises the run.
     fps[next(iter(fps))].save(out_dir / "fingerprint")
 
     judge = judge or make_judge(cfg["judge"])

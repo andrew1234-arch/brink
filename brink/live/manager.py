@@ -9,7 +9,7 @@ from pathlib import Path
 from brink.live.config import LiveConfig
 from brink.live.pipeline import release_memory, run_live
 
-MODEL_LOCK = threading.Lock()  # one model job at a time in this process (a live run or a gate upload)
+MODEL_LOCK = threading.Lock()
 
 
 class LiveManager:
@@ -17,7 +17,7 @@ class LiveManager:
 
     def __init__(self, root: Path):
         self.root = Path(root)
-        self.owner: str | None = None  # who started the current run (a browser session); only they can stop it
+        self.owner: str | None = None
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -42,7 +42,7 @@ class LiveManager:
                 try:
                     run_live(cfg, run_dir, should_stop=self._stop.is_set, **kw)
                 except Exception:
-                    pass  # recorded in status.json
+                    pass
                 finally:
                     release_memory()
                     MODEL_LOCK.release()

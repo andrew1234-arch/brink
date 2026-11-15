@@ -20,7 +20,7 @@ def test_layer_mass_parses_heads_and_mlps():
 
 def test_consistent_when_circuit_sits_upstream_and_tracks_separation():
     scores = {"A1.0": 3.0, "MLP 2": 4.0, "A3.2": 1.0, "MLP 6": 0.2}
-    sep = [0.0, 0.5, 1.5, 3.0, 3.2, 3.2, 3.1, 3.3, 3.3]  # embeddings + 8 layers
+    sep = [0.0, 0.5, 1.5, 3.0, 3.2, 3.2, 3.1, 3.3, 3.3]
     s = compare(scores, fp_layer=4, separation=sep, n_layers=8)
     assert s["peak_block"] == 2 and s["mass_upstream_of_brink_layer"] == pytest.approx(8 / 8.2)
     assert s["spearman_separation_vs_circuit_mass"] > 0.5 and s["consistent"]

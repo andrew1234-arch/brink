@@ -36,7 +36,7 @@ def test_discover_and_load(runs):
 
 def test_partial_line_is_ignored(tmp_path):
     p = tmp_path / "probe.csv"
-    p.write_text("step,S1,z_S1\n0,1.0,0.0\n4,0.9,-1.0\n8,0.8")  # last row cut off mid-write
+    p.write_text("step,S1,z_S1\n0,1.0,0.0\n4,0.9,-1.0\n8,0.8")
     rows = read_rows(p)
     assert [r["step"] for r in rows] == [0.0, 4.0]
 
@@ -46,7 +46,7 @@ def test_metrics_on_simulated_drift(runs):
     rule = rule_from_run(go, "S3")
     pos, ctl = go.conditions["pos"], go.conditions["control"]
     a, b = alarm_step(pos, rule), behaviour_break(pos, rule.asr_jump)
-    assert a is not None and b is not None and a < b  # the simulated shape leads by design
+    assert a is not None and b is not None and a < b
     assert alarm_step(ctl, rule) is None
     assert status(pos, rule)[0] == "alarm" and status(ctl, rule)[0] == "safe"
     k = kpis(go, pos, rule)
@@ -71,10 +71,10 @@ def test_figures_build(runs, mode):
         F.fig_gate_hist(go, mode),
     ]
     for f in figs:
-        f.to_json()  # serialisable = renderable by Gradio
+        f.to_json()
     assert figs[0].layout.paper_bgcolor == F.THEMES[mode]["surface"]
-    assert len(figs[0].data) == 3  # S1, S2, S3
-    assert len(figs[4].data) == 2  # benign, planted
+    assert len(figs[0].data) == 3
+    assert len(figs[4].data) == 2
 
 
 def test_app_builds_and_refreshes(runs):
@@ -117,12 +117,12 @@ def test_multi_seed_runs(tmp_path):
     from brink.dashboard.simulate import simulate_go_nogo
 
     run_dir = simulate_go_nogo(tmp_path / "sim")
-    for c in ("pos", "control"):  # rename to the multi-seed layout
+    for c in ("pos", "control"):
         (run_dir / c).rename(run_dir / f"{c}_s0")
     sys.path.insert(0, str(ROOT / "app"))
     import app as dash
 
-    dash.build(tmp_path)  # builds with seed-suffixed conditions
+    dash.build(tmp_path)
     t = F.THEMES["light"]
     names = ["control_s0", "control_s1", "pos_s0", "pos_s1"]
     assert _cond_color(t, names, "pos_s0") == _cond_color(t, names, "pos_s1") == t["series"][0]

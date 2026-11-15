@@ -39,9 +39,9 @@ def _cfg(api_out=10.0, gpu=0.5):
 
 def test_roi_arithmetic():
     r = roi(_cfg(), seconds_per_reply=0.5)
-    assert r["closed_api"]["monthly_usd"] == pytest.approx(100_000 * (400 * 2 + 200 * 10) / 1e6)  # 280
+    assert r["closed_api"]["monthly_usd"] == pytest.approx(100_000 * (400 * 2 + 200 * 10) / 1e6)
     assert r["self_hosted"]["gpu_hours_per_month"] == pytest.approx(100_000 * 0.5 / 3600)
-    assert r["self_hosted"]["monthly_usd"] == pytest.approx(720 * 0.5)  # one GPU kept up all month: 360
+    assert r["self_hosted"]["monthly_usd"] == pytest.approx(720 * 0.5)
     assert r["monthly_saving_usd"] == pytest.approx(-80) and r["payback_months"] is None
     assert "never" in report(r)
     r2 = roi(_cfg(api_out=50.0), seconds_per_reply=0.5)

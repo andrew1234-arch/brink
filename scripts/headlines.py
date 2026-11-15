@@ -77,9 +77,7 @@ def _repair(s, cond, key="asr"):
     return _get(s, "conditions", cond, key)
 
 
-# name -> (stage, extractor(summary), format, where it comes from)
 SPEC: dict[str, tuple[str, Callable, Callable, str]] = {
-    # 00 go / no-go
     "go_nogo.verdict": ("go_nogo", lambda s: s.get("verdict"), text, "verdict"),
     "go_nogo.signal": (
         "go_nogo",
@@ -119,7 +117,6 @@ SPEC: dict[str, tuple[str, Callable, Callable, str]] = {
         num,
         "cheap_judge_baseline.seconds_per_check / mean(runs.*[].probe_seconds)",
     ),
-    # 01 gate
     "gate.verdict": ("gate", lambda s: s.get("verdict"), text, "verdict"),
     "gate.auroc": (
         "gate",
@@ -137,7 +134,6 @@ SPEC: dict[str, tuple[str, Callable, Callable, str]] = {
     "gate.asr_top": ("gate", lambda s: _get(s, "runs", "top", "asr_final"), pct, "runs.top.asr_final"),
     "gate.asr_random": ("gate", lambda s: _get(s, "runs", "random", "asr_final"), pct, "runs.random.asr_final"),
     "gate.asr_bottom": ("gate", lambda s: _get(s, "runs", "bottom", "asr_final"), pct, "runs.bottom.asr_final"),
-    # 02 repair
     "repair.verdict": ("repair", lambda s: s.get("verdict"), text, "verdict"),
     "repair.best_policy": ("repair", lambda s: s.get("best_policy"), text, "best_policy"),
     "repair.asr_none": ("repair", lambda s: _repair(s, "none"), pct, "conditions.none.asr"),
@@ -157,7 +153,6 @@ SPEC: dict[str, tuple[str, Callable, Callable, str]] = {
     "repair.asr_safety_mix": ("repair", lambda s: _repair(s, "safety_mix"), pct, "conditions.safety_mix.asr"),
     "repair.asr_resta": ("repair", lambda s: _repair(s, "posthoc_resta"), pct, "conditions.posthoc_resta.asr"),
     "repair.asr_steer": ("repair", lambda s: _repair(s, "posthoc_steer"), pct, "conditions.posthoc_steer.asr"),
-    # 03 multilingual
     "multilingual.first_break_lang": (
         "multilingual",
         lambda s: _get(s, "findings", "first_language_to_break", "lang"),
@@ -176,7 +171,6 @@ SPEC: dict[str, tuple[str, Callable, Callable, str]] = {
         num,
         "findings.english_only_alarm_lead (steps)",
     ),
-    # 04 pipeline (Hindi assistant)
     "pipeline.verdict": ("pipeline", lambda s: s.get("verdict"), text, "verdict"),
     "pipeline.asr_before": ("pipeline", lambda s: _pipe(s, "naive", "ref", "asr"), pct, "conditions.naive.ref.asr"),
     "pipeline.asr_naive": ("pipeline", lambda s: _pipe(s, "naive", "final", "asr"), pct, "conditions.naive.final.asr"),
@@ -265,10 +259,8 @@ SPEC: dict[str, tuple[str, Callable, Callable, str]] = {
         num,
         "conditions.brink.gate.planted_total",
     ),
-    # live (the recorded end-to-end run)
     "live.verdict": ("live", lambda s: s.get("verdict"), text, "verdict"),
     "live.loss_prevented": ("live", lambda s: s.get("loss_prevented"), pct, "loss_prevented"),
-    # circuit (CircuitKIT)
     "circuit.upstream": (
         "circuit",
         lambda s: s.get("mass_upstream_of_brink_layer"),
@@ -283,7 +275,6 @@ SPEC: dict[str, tuple[str, Callable, Callable, str]] = {
     ),
     "circuit.peak_block": ("circuit", lambda s: s.get("peak_block"), num, "peak_block"),
     "circuit.brink_layer": ("circuit", lambda s: s.get("brink_layer"), num, "brink_layer"),
-    # ROI (results/roi.json)
     "roi.self_hosted_monthly": ("roi", lambda s: _get(s, "self_hosted", "monthly_usd"), num, "self_hosted.monthly_usd"),
     "roi.api_monthly": ("roi", lambda s: _get(s, "closed_api", "monthly_usd"), num, "closed_api.monthly_usd"),
     "roi.api_model": ("roi", lambda s: _get(s, "closed_api", "model"), text, "closed_api.model"),

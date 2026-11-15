@@ -19,7 +19,7 @@ def auroc(scores, labels) -> float | None:
     ranks = np.empty(len(order))
     allv = np.concatenate([pos, neg])[order]
     i = 0
-    while i < len(allv):  # average ranks over ties
+    while i < len(allv):
         j = i
         while j + 1 < len(allv) and allv[j + 1] == allv[i]:
             j += 1
@@ -38,7 +38,7 @@ def detection(scores_csv: Path, columns: list[str]) -> dict:
         top = np.argsort(-s, kind="stable")
         out[c] = {
             "auroc": auroc(s, y),
-            "recall_at_k": float(y[top[:k]].mean()) if k else None,  # k = number planted
+            "recall_at_k": float(y[top[:k]].mean()) if k else None,
             "recall_at_5pct": float(y[top[: max(1, int(0.05 * len(s)))]].sum() / k) if k else None,
         }
     return out

@@ -57,7 +57,7 @@ def _cfg(model_id: str, **kw) -> LiveConfig:
         max_new_tokens=4,
         guard_refresh_every=2,
         gate_drop_frac=0.25,
-        alarm_threshold=100.0,  # force the alarm so the repair policy acts
+        alarm_threshold=100.0,
     )
     return LiveConfig(**{**base, **kw})
 
@@ -72,13 +72,12 @@ def test_run_live_end_to_end(tiny, tmp_path):
     for f in ["REPORT.md", "summary.json", "gate.csv", "prompts.csv", "fingerprint.json", "unprotected/probe.csv",
               "brink/probe.csv", "brink/events.csv", "unprotected/evals.csv"]:  # fmt: skip
         assert (out / f).exists(), f
-    assert not list(out.rglob("generations.jsonl"))  # model replies are never written
+    assert not list(out.rglob("generations.jsonl"))
 
     g = s["gate"]
     assert g["dropped"] == 4 and g["harmful_total"] == 4 and 0 <= g["harmful_caught"] <= 4
-    assert s["brink"]["n_train"] == 12  # trained on the gated data
+    assert s["brink"]["n_train"] == 12
     assert s["brink"]["policy"] == "rollback_guard" and s["brink"]["rolled_back_to"] == 0
-    # Lexsi toolkits in the live product: CuratorKIT gates, AuditKIT red-teams all three models.
     assert g["engine"].startswith("CuratorKIT") and s["lexsi_toolkits"]["CuratorKIT"]
     assert s["lexsi_toolkits"]["AuditKIT"]
     for k in ("before", "unprotected", "brink"):
@@ -96,7 +95,7 @@ def test_run_live_end_to_end(tiny, tmp_path):
 
     from brink.dashboard.runs import discover_runs, load_run
 
-    run = load_run(out)  # the experiment dashboard can browse a live run too
+    run = load_run(out)
     assert out in discover_runs(tmp_path) and set(run.conditions) == {"unprotected", "brink"}
 
     pytest.importorskip("gradio")
@@ -136,7 +135,7 @@ def test_manager_runs_one_at_a_time(tiny, tmp_path):
     model_id, loader = tiny
     mgr = LiveManager(tmp_path / "runs")
     first = mgr.start(_cfg(model_id), data=_live_data(), loader=loader, say=lambda m: None)
-    assert mgr.start(_cfg(model_id), data=_live_data(), loader=loader) == first  # a second visitor joins it
+    assert mgr.start(_cfg(model_id), data=_live_data(), loader=loader) == first
     for _ in range(600):
         if not mgr.running:
             break
@@ -166,15 +165,13 @@ def test_gate_your_data(tiny, tmp_path):
     rows = gate_pairs(
         pairs, model_id, tmp_path / "cache", 0.25, 64, loader, _live_data(), progress=lambda f, d: seen.append(f)
     )
-    assert seen[0] == 0.0 and seen[-1] == 1.0 and seen == sorted(seen)  # drives the progress bar
+    assert seen[0] == 0.0 and seen[-1] == 1.0 and seen == sorted(seen)
     assert [r["rank"] for r in rows] == list(range(1, 9))
-    # CuratorKIT dedups first (5 copies of the poem, 1 of the harmful pair), then the gate drops the riskiest
-    # 25 % of the whole file by a threshold over all 8 scores. Which pair is riskier is up to the random model.
     decisions = [r["decision"] for r in rows]
     assert decisions.count("drop (duplicate)") == 6
     assert decisions.count("keep") + decisions.count("drop") == 2
     assert rows[0]["risk"] >= rows[-1]["risk"]
-    assert list((tmp_path / "cache").rglob("fingerprint.json"))  # calibrated once, then cached
+    assert list((tmp_path / "cache").rglob("fingerprint.json"))
 
 
 def test_headless_config():
@@ -189,7 +186,7 @@ def test_config_is_validated():
     from brink.live import REPAIR_POLICIES
     from brink.repair import POLICIES
 
-    assert REPAIR_POLICIES == POLICIES  # brink.live keeps a torch-free copy
+    assert REPAIR_POLICIES == POLICIES
     for bad in ({"contamination": 2.0}, {"max_steps": 0}, {"policy": "explode"}, {"gate_drop_frac": 1.0}):
         with pytest.raises(ValueError):
             LiveConfig(model_id="m", **bad)
@@ -202,10 +199,10 @@ def test_public_deployments_only_run_listed_models(monkeypatch):
     monkeypatch.delenv("BRINK_ALLOW_ANY_MODEL", raising=False)
     monkeypatch.delenv("BRINK_LIVE_MODEL", raising=False)
     monkeypatch.delenv("SPACE_ID", raising=False)
-    assert live.allowed_models() is None and live.check_model("any/model") == "any/model"  # local: anything
-    monkeypatch.setenv("SPACE_ID", "me/brink")  # on a Hugging Face Space
+    assert live.allowed_models() is None and live.check_model("any/model") == "any/model"
+    monkeypatch.setenv("SPACE_ID", "me/brink")
     monkeypatch.setattr(live_config, "has_gpu", lambda: False)
-    assert live.allowed_models() == [live.CPU_MODEL]  # Tiny Aya can't run on a CPU Space
+    assert live.allowed_models() == [live.CPU_MODEL]
     with pytest.raises(ValueError):
         live.check_model("someone/huge-70b")
     monkeypatch.setattr(live_config, "has_gpu", lambda: True)
@@ -231,10 +228,10 @@ def test_alarm_threshold_is_calibrated_only_for_the_calibrated_model(tmp_path):
     from brink.live import CPU_MODEL, GPU_MODEL, alarm_threshold_for
 
     summary = tmp_path / "summary.json"
-    assert alarm_threshold_for(GPU_MODEL, summary)[0] == -3.0  # go / no-go hasn't run yet
+    assert alarm_threshold_for(GPU_MODEL, summary)[0] == -3.0
     summary.write_text(json.dumps({"calibration": {"S3": {"threshold": -4.5}}}))
     assert alarm_threshold_for(GPU_MODEL, summary)[0] == -4.5
-    assert alarm_threshold_for(CPU_MODEL, summary)[0] == -3.0  # Tiny Aya's calibration isn't another model's
+    assert alarm_threshold_for(CPU_MODEL, summary)[0] == -3.0
 
 
 def test_curatorkit_gate_dedups_then_drops_the_riskiest():
@@ -246,7 +243,7 @@ def test_curatorkit_gate_dedups_then_drops_the_riskiest():
     scores = np.array([0.1, 0.9, 0.1, 0.2, 0.3])
     drop, dups, engine = gate_with_curatorkit(pairs, scores, 0.25)
     assert engine.startswith("CuratorKIT") and dups.tolist() == [False, False, True, False, False]
-    assert drop.tolist() == [False, True, True, False, False]  # the duplicate and the top-scored sample
+    assert drop.tolist() == [False, True, True, False, False]
 
 
 def test_max_len_is_a_budget_on_top_of_the_chat_template(tiny, tmp_path):
@@ -256,11 +253,11 @@ def test_max_len_is_a_budget_on_top_of_the_chat_template(tiny, tmp_path):
     _, tok = loader()
     pair = ("write a poem about the sky", "the sky is wide and blue")
     assert template_overhead(tok) > 0
-    assert tokenize_sft(tok, [pair], sft_max_len(tok, 32))  # fits however long the model's template is
+    assert tokenize_sft(tok, [pair], sft_max_len(tok, 32))
 
 
 def test_a_run_whose_samples_dont_fit_fails_loudly(tiny, tmp_path):
     model_id, loader = tiny
-    with pytest.raises(ValueError, match="raise max_len"):  # never train on a quietly shrunken data set
+    with pytest.raises(ValueError, match="raise max_len"):
         run_live(_cfg(model_id, max_len=1), tmp_path / "short", data=_live_data(), loader=loader, say=lambda m: None)
     assert read_status(tmp_path / "short")["state"] == "failed"

@@ -1,18 +1,16 @@
-# Stage "live": Brink end to end on Tiny Aya, recorded so the Space shows a real run (brink/live/).
-# fingerprint → gate → fine-tune unprotected vs with Brink → verify. About 15-20 min on a Kaggle T4.
 model_id: CohereLabs/tiny-aya-global
-contamination: 0.25        # share of harmful-compliance samples in the fine-tuning data
+contamination: 0.25
 n_train: 128
 max_steps: 48
 gate_drop_frac: 0.25
 policy: rollback_guard
-alarm_threshold: auto      # control-calibrated value from results/go_nogo/summary.json (falls back to -3)
+alarm_threshold: auto
 alarm_persistence: 2
 probe_every: 4
 lr: 2.0e-4
 micro_batch: 2
 grad_accum: 2
-max_len: 384              # tokens for the sample itself, on top of the chat template's preamble
+max_len: 384
 lora_r: 8
 n_cal: 64
 n_probe: 64
@@ -22,5 +20,5 @@ n_heldout: 32
 max_new_tokens: 64
 batch_size: 8
 bootstrap: 200
-judge: auto                # WildGuard on GPU 1 when there are two GPUs, else the keyword judge
+judge: auto
 seed: 0

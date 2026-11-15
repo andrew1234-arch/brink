@@ -30,8 +30,6 @@ from brink.probe.fingerprint import SafetyFingerprint
 from brink.probe.signals import lse_gap
 from brink.utils import amp_dtype, batched, format_prompt
 
-# --------------------------------------------------------------------------- LoRA for scoring
-
 
 def wrap_lora_for_scoring(model, r: int = 8, alpha: int = 16, target_modules="all-linear", seed: int = 0):
     """Fresh LoRA adapters (dropout 0, deterministic init). Train mode only so gradient checkpointing applies."""
@@ -63,9 +61,6 @@ def _autocast(device):
 def _loss_scale(device) -> float:
     """Static loss scale so fp16 gradients don't underflow. Cosines are scale-invariant; dots are rescaled."""
     return 1024.0 if amp_dtype(device) == torch.float16 else 1.0
-
-
-# --------------------------------------------------------------------------- objective J
 
 
 def _forward_last(model, tok, texts: list[str]):
@@ -156,9 +151,6 @@ def objective_gradient(model, tok, fp, harmful, harmless, target="S3", batch_siz
     return grads
 
 
-# --------------------------------------------------------------------------- per-sample scores
-
-
 def grad_scores(
     model,
     tok,
@@ -228,12 +220,10 @@ def reply_states(model, tok, pairs: list[Pair], layer: int, max_len: int = 1024,
     rows = []
     try:
         for chunk in batched(examples, batch_size):
-            b = collate(list(chunk), tok.pad_token_id)  # right padding: positions are already correct
+            b = collate(list(chunk), tok.pad_token_id)
             b = {k: v.to(device) for k, v in b.items()}
             reply = (b.pop("labels") != -100).float()
             with _autocast(device):
-                # Only hidden states are needed: skip the logits, which for a large vocabulary are the biggest
-                # tensor of the forward pass (Tiny Aya's ran a T4 out of memory here).
                 out = model(**b, output_hidden_states=True, use_cache=False, logits_to_keep=1)
             h = out.hidden_states[layer].float()
             rows.append(((h * reply[..., None]).sum(1) / reply.sum(1, keepdim=True).clamp(min=1)).cpu())
@@ -256,9 +246,6 @@ def rep_scores(
     mu_u = F.normalize(reply_states(model, tok, unsafe, layer, max_len, batch_size).mean(0), dim=-1)
     mu_s = F.normalize(reply_states(model, tok, safe, layer, max_len, batch_size).mean(0), dim=-1)
     return (h @ mu_u - h @ mu_s).numpy()
-
-
-# --------------------------------------------------------------------------- facade
 
 
 class GateScorer:
@@ -300,9 +287,6 @@ class GateScorer:
         layer = self.fp.layer if layer is None else layer
         with self.model.disable_adapter():
             return rep_scores(self.model, self.tok, pairs, unsafe, safe, layer, self.max_len, self.batch_size)
-
-
-# --------------------------------------------------------------------------- selection
 
 
 def drop_mask(scores: np.ndarray, drop_frac: float | None = None, threshold: float | None = None) -> np.ndarray:

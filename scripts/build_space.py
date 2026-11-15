@@ -121,7 +121,7 @@ def copy_results(src: Path, dst: Path) -> tuple[int, list[str]]:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, target)
                 n += 1
-    for name in ("ROI.md", "roi.json"):  # the ROI comparison lives at the top of results/
+    for name in ("ROI.md", "roi.json"):
         if (src / name).is_file():
             dst.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src / name, dst / name)
@@ -159,7 +159,7 @@ def build(out: Path, results: Path | None, demo: bool, sdk: str = "gradio") -> P
     out.mkdir(parents=True)
     if sdk == "static":
         return build_static(out, results, demo)
-    shutil.copy2(ROOT / "app" / "app.py", out / "dashboard.py")  # not app.py: the Space entry point is app.py
+    shutil.copy2(ROOT / "app" / "app.py", out / "dashboard.py")
     shutil.copy2(ROOT / "app" / "live_tab.py", out / "live_tab.py")
     shutil.copytree(ROOT / "app" / "examples", out / "examples")
     shutil.copytree(ROOT / "brink", out / "brink", ignore=shutil.ignore_patterns("__pycache__"))
@@ -195,7 +195,6 @@ def push(
         api = HfApi()
     api.create_repo(space_id, repo_type="space", space_sdk=sdk, private=not public, exist_ok=True)
     set_visibility(api, space_id, public)
-    # "*" removes remote files that aren't in this upload (renamed modules, old results); uploaded files are kept.
     api.upload_folder(
         folder_path=str(out), repo_id=space_id, repo_type="space", commit_message=message, delete_patterns=["*"]
     )

@@ -7,7 +7,7 @@ from pathlib import Path
 from brink.io import read_csv, write_json
 from brink.monitor.detector import first_alarm
 
-SERIES = ["#2a78d6", "#eb6834", "#1baf7a"]  # validated categorical slots; one per language, fixed order
+SERIES = ["#2a78d6", "#eb6834", "#1baf7a"]
 
 
 def _key(lang: str, primary: str, k: str) -> str:

@@ -39,7 +39,7 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict) -> dict:
     out_dir = Path(out_dir)
     res = {c: _cond(out_dir, c) for c in conditions}
     none = res.get("none")
-    for c in POSTHOC:  # post-hoc repairs start from the drifted `none` model
+    for c in POSTHOC:
         if res.get(c) and none:
             res[c].update(
                 asr0=none["asr"],
@@ -52,7 +52,6 @@ def analyze(out_dir: Path, conditions: list[str], cfg: dict) -> dict:
         drift = none["asr"] - (none["asr0"] or 0.0)
         cands = [(c, r) for c, r in res.items() if c in BRINK and r and r.get("asr") is not None]
         if cands and drift > 0:
-            # Best Brink policy: lowest ASR among those that kept capability within tolerance of `none`.
             ok = [
                 (c, r)
                 for c, r in cands

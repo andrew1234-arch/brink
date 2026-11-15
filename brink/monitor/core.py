@@ -30,8 +30,6 @@ class Monitor:
         cheap_check: Callable | None = None,
     ):
         self.prober, self.evaluator = prober, evaluator
-        # Baseline monitor: a small behavioural check (few prompts, short replies, keyword judge) at every probe
-        # step, so Brink's probe can be compared with "just run a cheap judge every N steps" on cost and lead.
         self.cheap_check = cheap_check
         self.probe_every = probe_every
         self.eval_steps = set(eval_steps or [])
@@ -39,7 +37,7 @@ class Monitor:
         self.probe_log = CsvLog(self.out_dir / "probe.csv")
         self.eval_log = CsvLog(self.out_dir / "evals.csv")
         self.event_log = CsvLog(self.out_dir / "events.csv")
-        self.gen_path = self.out_dir / "generations.jsonl"  # git-ignored: may contain harmful text
+        self.gen_path = self.out_dir / "generations.jsonl"
         self.save_generations = save_generations
         if self.gen_path.exists():
             self.gen_path.unlink()
@@ -52,7 +50,6 @@ class Monitor:
         self.alarm_step: int | None = None
         self._evaluated: set[int] = set()
 
-    # ------------------------------------------------------------------ alarm
     def _update_alarm(self, step: int, sig: dict) -> tuple[bool, bool]:
         """Returns (breach now, alarm fired at this step)."""
         if not self.alarm_signal:
@@ -74,7 +71,6 @@ class Monitor:
         self.event_log.write({"step": step, "event": event, "detail": detail, "time": round(time.time(), 1)})
         print(f"[monitor] step {step:4d}  EVENT {event}: {detail}", flush=True)
 
-    # ------------------------------------------------------------------ checks
     def evaluate_now(self, model, step: int) -> dict | None:
         """Behavioural eval at an arbitrary step (e.g. when training halts). Skips if already done."""
         if self.evaluator is None or step in self._evaluated:

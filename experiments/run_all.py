@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from brink.io import stage_finished
 
-STAGES = ["go_nogo", "pipeline", "live", "gate", "repair", "multilingual", "circuit"]  # most important first
+STAGES = ["go_nogo", "pipeline", "live", "gate", "repair", "multilingual", "circuit"]
 HOURS_T4X2 = {
     "go_nogo": 2.7,
     "gate": 1.5,
@@ -62,7 +62,6 @@ def main() -> int:
         cfg = f"configs/{stage}.yaml"
         t0 = time.time()
         print(f"\n{'=' * 80}\n{stage}\n{'=' * 80}", flush=True)
-        # `live` validates its own model and data as its first stages; `circuit` needs `pip install circuitkit`.
         preflight = [sys.executable, "experiments/preflight.py", "--config", cfg]
         if stage not in ("live", "circuit") and not args.skip_preflight and run(preflight) != 0:
             status[stage] = "skipped: preflight failed"

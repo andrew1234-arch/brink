@@ -55,9 +55,6 @@ class _Stoppable:
         return self.ctl.on_step(model, step)
 
 
-# --------------------------------------------------------------------------- Lexsi toolkits
-
-
 def _redteam(model, tok, cfg, st, name, judge=None) -> dict | None:
     """AuditKIT red-team probes on one model. None when switched off or AuditKIT isn't installed."""
     from brink.eval.audit import redteam
@@ -92,7 +89,6 @@ def gate_with_curatorkit(pairs, scores, drop_frac: float):
         DataSample(id=str(i), source_uri="brink-live", instruction=u, output=r) for i, (u, r) in enumerate(pairs)
     ]
     scores = np.asarray(scores, float)
-    # The share is of the whole file, not of what survives dedup: turn it into a score threshold first.
     full = drop_mask(scores, drop_frac)
     threshold = float(scores[~full].max()) if (~full).any() else -np.inf
     if not full.any():
@@ -106,9 +102,6 @@ def gate_with_curatorkit(pairs, scores, drop_frac: float):
     dup = np.ones(len(pairs), bool)
     dup[idx] = False
     return drop, dup, "CuratorKIT: ExactDeduplicator → BrinkSafetyGate"
-
-
-# --------------------------------------------------------------------------- the run
 
 
 def _label(harmful) -> str:
@@ -150,7 +143,7 @@ def _fine_tune(name, pairs, policy, eval_steps, cfg, fp, data, loader, judge, ou
             f"{name}: refuses {metrics['refusal_rate']:.0%} of held-out harmful prompts, "
             f"over-refusal {metrics['over_refusal']:.0%}, task loss {metrics['heldout_loss']:.3f}"
         )
-        return metrics, []  # replies are never stored
+        return metrics, []
 
     monitor = Monitor(
         Prober(fp, tok, data.harmful_probe, data.harmless_probe, cfg.batch_size),
@@ -179,7 +172,7 @@ def _fine_tune(name, pairs, policy, eval_steps, cfg, fp, data, loader, judge, ou
         log=CsvLog(cdir / "train.csv"),
         controller=_Stoppable(ctl, should_stop),
     )
-    monitor.evaluate_now(model, ctl.halted_at or cfg.max_steps)  # no-op if that step was already evaluated
+    monitor.evaluate_now(model, ctl.halted_at or cfg.max_steps)
     train_seconds = round(time.time() - t0, 1)
     rt = _redteam(model, tok, cfg, st, name, judge)
     summary = {**ctl.summary(), "train_seconds": train_seconds, "n_train": len(pairs), "redteam": rt}
@@ -221,8 +214,8 @@ def run_live(
     except Exception as e:
         st.log(f"FAILED: {type(e).__name__}: {e}")
         st.finish("failed", f"{type(e).__name__}: {e}")
-        raise  # the caller frees the memory once the traceback (which holds the model) is gone
-    if summary is None:  # outside the except block, so the stopped run's model can be freed now
+        raise
+    if summary is None:
         release_memory()
         st.log("stopped by the user")
         st.finish("stopped")
@@ -272,10 +265,7 @@ def _run(cfg, out, data, loader, judge, should_stop, st) -> dict:
         set_seed(cfg.seed)
         st.log(f"loading {cfg.model_id}")
         model, tok = loader()
-        # cfg.max_len is the budget for the sample itself, on top of what the chat template adds.
         cfg = replace(cfg, max_len=sft_max_len(tok, cfg.max_len))
-        # Samples whose prompt alone exceeds max_len can't be trained or scored: drop them up front, but never
-        # quietly shrink the experiment.
         keep = [i for i, p in enumerate(data.train) if tokenize_sft(tok, [p], cfg.max_len)]
         if len(keep) < len(data.train):
             st.log(f"{len(data.train) - len(keep)} of {len(data.train)} samples are too long for max_len, dropped")

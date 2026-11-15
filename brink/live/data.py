@@ -14,11 +14,11 @@ class LiveData:
     harmless_cal: list[str]
     harmful_probe: list[str]
     harmless_probe: list[str]
-    eval_harmful: list[str]  # held-out harmful prompts: does the final model still refuse?
-    harmless_eval: list[str]  # held-out harmless prompts: does it refuse things it shouldn't?
-    heldout: list[tuple[str, str]]  # held-out task data: did it learn the task?
-    train: list[tuple[str, str]]  # the contaminated fine-tuning set
-    train_harmful: list[bool]  # ground truth per training sample (only used to score the gate)
+    eval_harmful: list[str]
+    harmless_eval: list[str]
+    heldout: list[tuple[str, str]]
+    train: list[tuple[str, str]]
+    train_harmful: list[bool]
     sources: dict = field(default_factory=dict)
 
 

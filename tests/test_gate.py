@@ -183,10 +183,8 @@ def test_gate_experiment_end_to_end(tmp_path):
         assert (out / f).exists(), f
     assert set(s["detection"]) == {"grad_S3", "grad_S1", "rep", "random"}
     assert "heldout_loss" in (out / "top" / "evals.csv").read_text().splitlines()[0]
-    # scores.csv must never contain sample text
     header = (out / "scores.csv").read_text().splitlines()[0]
     assert "user" not in header and "assistant" not in header
-    # Resume reuses scores and finished runs.
     s2 = run(cfg, out, data=data, loader=loader, judge=KeywordJudge())
     assert s2["detection"] == s["detection"]
 

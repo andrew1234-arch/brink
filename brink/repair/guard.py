@@ -45,7 +45,7 @@ class ErosionGuard:
         """Recompute grad J at the current parameters. Call only when no task gradients are pending."""
         t0 = time.time()
         was_training = model.training
-        model.eval()  # no dropout noise in grad J
+        model.eval()
         try:
             self.g = objective_gradient(
                 model, self.tok, self.fp, self.harmful, self.harmless, self.target, self.batch_size
@@ -75,7 +75,7 @@ class ErosionGuard:
         for p, g in zip(params, self.g):
             if p.grad is not None:
                 p.grad.sub_(coef * g)
-        removed = (dot * dot / self.g_norm2) / max(gnorm2, 1e-30)  # share of |g|^2 removed
+        removed = (dot * dot / self.g_norm2) / max(gnorm2, 1e-30)
         self.stats["projected"] += 1
         n = self.stats["projected"]
         self.stats["mean_removed_frac"] += (removed - self.stats["mean_removed_frac"]) / n

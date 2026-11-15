@@ -14,13 +14,13 @@ from brink.probe.signals import SIGNALS, Collected, collect, compute_signals
 
 @dataclass
 class SafetyFingerprint:
-    layer: int  # l*, fixed at calibration (never auto-picked at runtime)
-    directions: torch.Tensor  # [L+1, d] unit refusal direction per layer
+    layer: int
+    directions: torch.Tensor
     refusal_ids: list[int]
     compliance_ids: list[int]
-    baseline: dict[str, float]  # signal values on the reference model (probe split)
-    noise: dict[str, float]  # bootstrap std of each signal (resampling probe prompts)
-    separation: list[float] = field(default_factory=list)  # Cohen's d per layer, for the record
+    baseline: dict[str, float]
+    noise: dict[str, float]
+    separation: list[float] = field(default_factory=list)
     meta: dict = field(default_factory=dict)
 
     @property
@@ -71,9 +71,8 @@ def calibrate(
     hc = collect(model, tok, harmful_cal, batch_size)
     bc = collect(model, tok, harmless_cal, batch_size)
 
-    directions = F.normalize(hc.acts.mean(1) - bc.acts.mean(1), dim=-1)  # [L+1, d]
+    directions = F.normalize(hc.acts.mean(1) - bc.acts.mean(1), dim=-1)
 
-    # Refusal tokens: most over-represented first tokens on harmful vs harmless prompts; and vice versa.
     p_h, p_b = hc.logp.exp().mean(0), bc.logp.exp().mean(0)
     diff = p_h - p_b
     special = _special_ids(tok)
@@ -82,7 +81,6 @@ def calibrate(
     refusal_ids = torch.topk(diff, n_tokens).indices.tolist()
     compliance_ids = torch.topk(-diff, n_tokens).indices.tolist()
 
-    # Layer choice on the held-out probe split: max Cohen's d between harmful and harmless projections.
     hp = collect(model, tok, harmful_probe, batch_size)
     bp = collect(model, tok, harmless_probe, batch_size)
     proj_h = torch.einsum("lnd,ld->ln", hp.acts, directions)
@@ -93,13 +91,11 @@ def calibrate(
     lo, hi = max(1, int(layer_range[0] * n_layers)), max(1, int(layer_range[1] * n_layers))
     layer = lo + int(torch.argmax(sep[lo : hi + 1]).item())
 
-    # Restrict probe-split log-probs to the selected tokens, as the live prober will.
     sel = torch.tensor(refusal_ids + compliance_ids)
     hp_sel = Collected(hp.acts, hp.logp[:, sel])
     bp_sel = Collected(bp.acts, bp.logp[:, sel])
     baseline = compute_signals(directions, layer, hp_sel, bp_sel, len(refusal_ids))
 
-    # Bootstrap noise: resample probe prompts, recompute every signal.
     g = torch.Generator().manual_seed(seed)
     nh, nb = hp.acts.shape[1], bp.acts.shape[1]
     boots = {k: [] for k in SIGNALS}

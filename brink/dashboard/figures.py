@@ -46,7 +46,7 @@ THEMES = {
     },
 }
 FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif'
-SIGNALS = ["S1", "S2", "S3"]  # fixed slot order: color follows the signal, never its rank
+SIGNALS = ["S1", "S2", "S3"]
 CONDITION_ORDER = ["pos", "control", "benign", "top", "random", "bottom"]
 
 
@@ -272,7 +272,7 @@ def fig_layers(cond: Condition | None, fingerprint: dict | None, mode: str = "li
     if cond is None or not cond.probe:
         return _empty(t, title, "No probe data yet")
     layer_keys = sorted((k for k in cond.probe[0] if k.startswith("S1_L")), key=lambda k: int(k[4:]))
-    layer_keys = [k for k in layer_keys if k != "S1_L0"]  # embeddings: constant, no signal
+    layer_keys = [k for k in layer_keys if k != "S1_L0"]
     if not layer_keys:
         return _empty(t, title, "No per-layer data in this run")
     base = {k: cond.probe[0][k] for k in layer_keys}
@@ -336,7 +336,7 @@ def fig_gate_hist(run: Run, mode: str = "light") -> go.Figure:
     fig = _base(t, title, "share of samples", height=320)
     allv = [r[primary] for r in run.scores if isinstance(r.get(primary), float)]
     lo, hi = min(allv), max(allv)
-    bins = {"start": lo, "end": hi, "size": (hi - lo) / 40 or 1.0}  # same bins for both groups
+    bins = {"start": lo, "end": hi, "size": (hi - lo) / 40 or 1.0}
     for i, src in enumerate(["benign", "planted"]):
         v = [r[primary] for r in run.scores if r.get("source") == src and isinstance(r.get(primary), float)]
         if v:
@@ -371,9 +371,7 @@ def fig_gate_subsets(run: Run, rule: AlarmRule, mode: str = "light") -> go.Figur
     return fig
 
 
-# --------------------------------------------------------------------------- live end-to-end run
-
-LIVE_SERIES = {"unprotected": ("Unprotected", 1), "brink": ("With Brink", 0)}  # fixed slots: orange, blue
+LIVE_SERIES = {"unprotected": ("Unprotected", 1), "brink": ("With Brink", 0)}
 
 
 def fig_live_signals(
@@ -406,7 +404,6 @@ def fig_live_signals(
         if last:
             _end_label(fig, t, last[0], last[1], label)
     fig.add_hline(y=threshold, line={"color": t["muted"], "width": 1, "dash": "dash"})
-    # Label the threshold at the left edge, above the line: the right edge holds the runs' end labels.
     fig.add_annotation(
         x=0,
         xref="paper",

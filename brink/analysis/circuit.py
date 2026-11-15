@@ -47,7 +47,7 @@ def compare(node_scores: dict[str, float], fp_layer: int, separation: list[float
     top = order[: max(1, round(0.2 * n_layers))]
     rho = None
     if len(separation) == n_layers + 1 and total:
-        written = np.concatenate([[0.0], np.cumsum(mass)])  # circuit mass written before each hidden state
+        written = np.concatenate([[0.0], np.cumsum(mass)])
         rho = _spearman(written[1:], np.asarray(separation[1:], float))
     return {
         "brink_layer": fp_layer,

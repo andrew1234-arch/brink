@@ -26,7 +26,7 @@ def read_rows(path: Path) -> list[dict]:
         reader = csv.DictReader(f)
         rows = []
         for r in reader:
-            if None in r or any(v is None for v in r.values()):  # truncated line
+            if None in r or any(v is None for v in r.values()):
                 continue
             rows.append({k: _num(v) for k, v in r.items()})
     return [r for r in rows if isinstance(r.get("step"), float)]
@@ -60,7 +60,7 @@ class Condition:
 @dataclass
 class Run:
     path: Path
-    kind: str  # "go_nogo" | "gate" | "live" | "unknown"
+    kind: str
     conditions: dict[str, Condition]
     fingerprint: dict | None = None
     summary: dict | None = None

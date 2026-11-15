@@ -93,9 +93,6 @@ def _json(path: Path) -> dict | None:
         return None
 
 
-# --------------------------------------------------------------------------- rendering a run folder
-
-
 def stages_html(status: dict | None, run_dir: Path | None) -> str:
     stages = (status or {}).get("stages") or {s: {"state": "pending"} for s in STAGES}
     cards = []
@@ -246,9 +243,6 @@ def gate_rows(run_dir: Path | None) -> list[list]:
         ]  # fmt: skip
 
 
-# --------------------------------------------------------------------------- tabs
-
-
 def _model_dropdown(**kw) -> gr.Dropdown:
     allowed = allowed_models()
     choices = allowed or [GPU_MODEL, CPU_MODEL]
@@ -259,7 +253,7 @@ def _model_dropdown(**kw) -> gr.Dropdown:
 
 def build_live_tab(results_root: Path, dark: gr.Checkbox) -> LiveManager:
     mgr = LiveManager(Path(os.environ.get("BRINK_LIVE_DIR") or Path(results_root) / "live_runs"))
-    recorded_root = Path(results_root) / "live"  # written by experiments/live.py (e.g. a Tiny Aya run on Kaggle)
+    recorded_root = Path(results_root) / "live"
     gpu = has_gpu() if ML_STACK else False
 
     gr.HTML(
@@ -312,7 +306,7 @@ def build_live_tab(results_root: Path, dark: gr.Checkbox) -> LiveManager:
     with gr.Accordion("Gate decisions (every training sample, riskiest first)", open=False):
         t_gate = gr.Dataframe(headers=["rank", "risk score", "actually", "gate"], interactive=False)
     log = gr.Textbox(label="Log", lines=8, max_lines=8, interactive=False, autoscroll=True)
-    timer = gr.Timer(2.0)  # 2 s while a run is going, 10 s when idle (to notice someone else's run)
+    timer = gr.Timer(2.0)
 
     def view(is_dark):
         mode = "dark" if is_dark else "light"
@@ -376,7 +370,6 @@ def build_live_tab(results_root: Path, dark: gr.Checkbox) -> LiveManager:
 
 
 def build_gate_tab(results_root: Path, dark: gr.Checkbox) -> None:
-    # Outside the results folder: a cached fingerprint.json there would show up as a bogus run in Experiments.
     cache = Path(os.environ.get("BRINK_CACHE_DIR") or Path.home() / ".cache" / "brink" / "fingerprints")
     gpu = has_gpu() if ML_STACK else False
     limit = 1000 if gpu else 200
@@ -414,7 +407,7 @@ def build_gate_tab(results_root: Path, dark: gr.Checkbox) -> None:
             rows = gate_pairs(pairs, model_id, cache, frac, progress=lambda f, d: progress(f, desc=d))
         except ValueError as e:
             raise gr.Error(str(e)) from e
-        except Exception as e:  # show the reason (e.g. a gated dataset), not Gradio's bare "Error"
+        except Exception as e:
             raise gr.Error(f"{type(e).__name__}: {e}.{_hint(str(e))}") from e
         finally:
             MODEL_LOCK.release()

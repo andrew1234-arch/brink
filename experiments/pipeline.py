@@ -41,9 +41,6 @@ GATED = {"brink", "gate_only"}
 POLICY = {"naive": "log", "brink": "rollback_guard", "gate_only": "log", "monitor_only": "rollback_guard"}
 
 
-# --------------------------------------------------------------------------- stage 1: curate + train (GPU 0)
-
-
 def write_raw(pool: list[dict], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w") as f:
@@ -98,7 +95,7 @@ def curate(cfg: dict, data: PipelineData, fp, loader, raw: Path, cdir: Path, wor
         "drop_frac": gc["drop_frac"],
         "seconds": round(time.time() - t0, 1),
     }
-    write_json(cdir / "gate.json", stats)  # counts only: rejected texts include harmful content
+    write_json(cdir / "gate.json", stats)
     print(f"[curate] {stats}", flush=True)
     del model, scorer
     release_gpu()
@@ -266,9 +263,6 @@ def train_stage(
         (cdir / "TRAINED").write_text("ok\n")
 
 
-# --------------------------------------------------------------------------- stage 2: evaluate (judge on GPU 1)
-
-
 def _evaluate(model, tok, data: PipelineData, judge, cfg: dict) -> dict:
     from brink.eval.audit import redteam
     from brink.eval.behavioral import evaluate_behavior, evaluate_over_refusal
@@ -292,7 +286,7 @@ def _evaluate(model, tok, data: PipelineData, judge, cfg: dict) -> dict:
     if ec.get("task_chrf_max_new_tokens"):
         t0 = time.time()
         m["task_chrf"] = task_chrf(model, tok, data.heldout, ec["task_chrf_max_new_tokens"], ec["batch_size"])
-        m["seconds_per_reply"] = (time.time() - t0) / max(len(data.heldout), 1)  # serving speed, for the ROI
+        m["seconds_per_reply"] = (time.time() - t0) / max(len(data.heldout), 1)
     if ec.get("redteam", True):
         try:
             m.update(
@@ -360,9 +354,6 @@ def run(
         env = dict(os.environ)
         if torch.cuda.device_count() >= 2:
             env["CUDA_VISIBLE_DEVICES"] = "0"
-        # One process per condition: everything the previous condition's trainer held on the GPU is freed when its
-        # process exits. In one process, AlignTune's trainer outlived `del model` and the next condition's gate
-        # (a second copy of Tiny Aya) ran a T4 out of memory.
         for cond in cfg["conditions"]:
             subprocess.run(
                 [
