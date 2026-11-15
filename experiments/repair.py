@@ -32,6 +32,7 @@ from brink.analysis.repair import analyze
 from brink.data import RepairData, build_repair_data, tokenize_sft
 from brink.eval.audit import redteam as auditkit_redteam
 from brink.eval.behavioral import make_judge
+from brink.io import record_failure
 from brink.monitor.core import Monitor
 from brink.probe import Prober
 from brink.repair import ErosionGuard, RepairController
@@ -226,7 +227,8 @@ def main():
     cfg = yaml.safe_load(Path(args.config).read_text())
     if args.conditions:
         cfg["conditions"] = args.conditions.split(",")
-    run(cfg, Path(args.out))
+    with record_failure(Path(args.out)):
+        run(cfg, Path(args.out))
 
 
 if __name__ == "__main__":

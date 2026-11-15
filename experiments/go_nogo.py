@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from brink.analysis.go_nogo import analyze
 from brink.data import GoNoGoData, build_go_nogo_data
 from brink.eval.behavioral import make_judge
+from brink.io import record_failure
 from brink.runner import calibrate_or_load, loader_from_config, run_condition, run_name, seeds_of
 from brink.utils import set_seed, write_json
 
@@ -67,7 +68,8 @@ def main():
     cfg = yaml.safe_load(Path(args.config).read_text())
     if args.conditions:
         cfg["conditions"] = args.conditions.split(",")
-    run(cfg, Path(args.out))
+    with record_failure(Path(args.out)):
+        run(cfg, Path(args.out))
 
 
 if __name__ == "__main__":

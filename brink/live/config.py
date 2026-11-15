@@ -83,9 +83,9 @@ class LiveConfig:
     alarm_persistence: int = 2
     probe_every: int = 4
     lr: float = 2e-4
-    micro_batch: int = 4
-    grad_accum: int = 1
-    max_len: int = 256
+    micro_batch: int = 2
+    grad_accum: int = 2
+    max_len: int = 256  # tokens for the sample itself, on top of the chat template (Tiny Aya's is long)
     lora_r: int = 8
     n_cal: int = 32
     n_probe: int = 32

@@ -12,7 +12,8 @@ name: Deploy dashboard to Hugging Face Space
 #
 # One-time setup (repo Settings → Secrets and variables → Actions):
 #   secret   HF_TOKEN          a Hugging Face token with WRITE access
-#   variable HF_SPACE_ID       e.g. your-hf-username/brink   (the job is skipped while this is unset)
+#   variable HF_SPACE_ID       e.g. your-hf-username/brink   (a secret of that name works too; without either the
+#                              deploy step is skipped with a notice)
 #   Without HF_TOKEN the deploy step is skipped with a notice.
 #   variable HF_SPACE_PUBLIC   "true" for a public Space; anything else keeps it private (applied every deploy)
 #   secret   HF_SPACE_TOKEN    optional READ token, installed as the Space's HF_TOKEN for live runs (gated datasets)
@@ -39,12 +40,13 @@ concurrency:
 jobs:
   deploy:
     # workflow_run: only CI runs that succeeded for a push in this repository, never a fork's pull request.
+    # (No check on HF_SPACE_ID here: it may be a variable or a secret, and secrets can't be read in a job `if`.
+    # scripts/deploy_space.py skips the deploy with a notice when it's missing.)
     if: >-
-      vars.HF_SPACE_ID != '' &&
-      (github.event_name != 'workflow_run' || (
+      github.event_name != 'workflow_run' || (
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_repository.full_name == github.repository))
+      github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -62,7 +64,7 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_TOKEN: ${{ secrets.HF_SPACE_TOKEN }}
-          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID || secrets.HF_SPACE_ID }}
           HF_SPACE_PUBLIC: ${{ vars.HF_SPACE_PUBLIC }}
           DEPLOY_EVENT: ${{ github.event_name }}
           GITHUB_TOKEN: ${{ github.token }}

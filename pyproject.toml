@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "brink-safety"
 version = "0.1.0"
-description = "Stop fine-tuning from breaking an LLM's safety: gate the data, watch refusal while it trains, roll back before behaviour breaks."
+description = "Stop fine-tuning from breaking an LLM's safety: gate the data, watch refusal while it trains, roll back as soon as it slips."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

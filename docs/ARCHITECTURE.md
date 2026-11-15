@@ -1,6 +1,6 @@
 # Brink — Architecture
 
-> Detect and prevent LLM safety collapse **during** fine-tuning, before behavioural evals can see it.
+> Detect and prevent LLM safety collapse **during** fine-tuning, as it happens, instead of after training.
 
 ## 1. Thesis (what we must prove)
 

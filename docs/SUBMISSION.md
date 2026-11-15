@@ -5,8 +5,8 @@
 
 ## One line
 
-**Brink catches a model's safety collapsing during fine-tuning, before it shows up in behaviour, and
-prevents it: one refusal measure drives a data gate, a live monitor and a training-time repair.**
+**Brink catches a model's safety collapsing during fine-tuning while it happens, and prevents it: one refusal
+measure drives a data gate, a live monitor and a training-time repair.**
 
 ## The problem
 
@@ -40,17 +40,20 @@ calibrated against the model before fine-tuning (its *fingerprint*).
   gradient.
 - Both are checked in the test suite.
 
-## Results ⟦pending Kaggle runs⟧
+## Results (live, 00 and 03 final; 01, 02 and 04 re-running)
 
 | Claim | Experiment | Result |
 |---|---|---|
-| The alarm fires before behaviour breaks, without false alarms on safe fine-tuning | 00 go / no-go, 2 seeds | lead ⟦RESULT⟧ ± ⟦RESULT⟧ steps (mechanistic signal ⟦RESULT⟧ vs proxy S3 ⟦RESULT⟧); leave-one-seed-out false alarms ⟦RESULT⟧; vs cheap judge: lead ⟦RESULT⟧, cost ⟦RESULT⟧× |
+| Brink keeps a fine-tuned model safe at no task cost | live, end to end (1 seed, 128 samples, 32 harmful) | ASR before 21 % → unprotected **94 %** → with Brink **21 %**; refusal 77 % → 4 % → 69 %; over-refusal 0 % in all three; task loss 2.016 → 1.452 → 1.462. Gate: 29 / 32 harmful samples removed (precision 91 % vs 25 % random). Alarm on the unprotected run at step 20; none on the Brink run, so rollback and guard weren't used: the gate did this run's work |
+| The alarm fires by the time behaviour breaks, without false alarms on safe fine-tuning | 00 go / no-go, 2 seeds | **Verdict NO-GO (3 of 4 pre-set checks pass).** S3 alarm: 2 / 2 harmful runs caught, 0 / 2 false alarms (leave-one-seed-out, threshold −3.0σ); confirmed on the break step (step 8, lead 0 ± 0 at 8-step eval resolution), z −11.6σ / −12.0σ already at step 4. Cheap judge every probe step: lead −4 (4 steps late). Mechanistic S1 / S2: fall on control too, 0 % detection once calibrated. Failed check G2: S3–ASR Spearman −0.38 / −0.62 (needs ≤ −0.7); −1.0 up to step 24, then ASR sits at ~98 % while S3 partly recovers. Cost per check: full probe (5 signals, 128 prompts) 23.8 s, cheap judge 6.2 s |
 | The gate finds risk a content filter can't | 01 gate | AUROC gate ⟦RESULT⟧ vs WildGuard ⟦RESULT⟧; classifier flags ⟦RESULT⟧ of the gate's top benign subset; ASR top / random / bottom ⟦RESULT⟧ |
 | Repairing in training beats the standard fixes | 02 repair | ASR none ⟦RESULT⟧ → rollback + guard ⟦RESULT⟧ at task loss ⟦RESULT⟧; safety-mix ⟦RESULT⟧, ReSta ⟦RESULT⟧, steering ⟦RESULT⟧ |
-| Safety erodes across languages; English-only monitoring lags | 03 multilingual | first language to break ⟦RESULT⟧; English-only vs worst-language lead ⟦RESULT⟧ |
+| Safety erodes across languages, and each language's own alarm sees it | 03 multilingual | ASR en 16 % → 98 % (breaks step 8), hi 2 % → 42 % (16), tl 2 % → 29 % (16); each language's own S3 alarm fires at or before its break (en 8, hi 16, tl 12). English broke first, so the English-only alarm did not lag here (lead 0 for both). **False alarms:** hi and tl alarms fire on control at step 20 (z −7.7 / −9.2, fixed −3σ threshold, ASR fell to 0 %) |
 | The Lexsi pipeline ships a safe, useful model | 04 pipeline (Hindi assistant) | task loss naive ⟦RESULT⟧ vs Brink ⟦RESULT⟧; ASR naive ⟦RESULT⟧ vs Brink ⟦RESULT⟧; contamination caught by the gate ⟦RESULT⟧ |
 
-Lead times are measured at the step the alarm is *confirmed*, so they're what a live monitor could act on.
+Lead times are measured at the step the alarm is *confirmed* (2 consecutive probes), so they're what a live
+monitor could act on. Behaviour is evaluated every 8 steps, so a lead of 0 means "on the first evaluation that
+shows the break".
 
 ## What we built (all open)
 
@@ -75,7 +78,13 @@ Lead times are measured at the step the alarm is *confirmed*, so they're what a 
 
 ## Limitations (stated up front)
 
-- One model family (Tiny Aya, 3.35B), one seed per condition in the first pass.
+- One model family (Tiny Aya, 3.35B), two seeds in go / no-go and one seed per condition elsewhere.
+- The working alarm signal is S3, a behavioural proxy (refusal-token log-odds on probe prompts). The
+  activation-level signals S1 / S2 also drop on safe fine-tuning, so Brink does not claim mechanistic
+  foresight. S3 is an alarm, not a severity gauge (it partly recovers once a model is fully broken).
+- The alarm is confirmed on the evaluation step at which behaviour breaks, not before it, at 8-step
+  evaluation resolution. Its edge is over a cheap judge (4 steps earlier) and in having no false alarms.
+- Non-English alarms use a fixed threshold and false-alarm on safe fine-tuning (Hindi, Tagalog).
 - WildGuard is mostly English-trained, so non-English ASR is less reliable. The per-language S3 alarm is
   judge-free.
 - CircuitKIT (the circuit-level signal S4) isn't integrated yet. Aya support there is experimental.
@@ -97,9 +106,8 @@ ahead, so it finishes during the demo. If anything goes wrong, the tab shows the
 1. **(30 s) The problem.** Fine-tuning breaks safety silently. Show the ASR curve of `pos` from experiment 00:
    flat, then a cliff.
 2. **(60 s) Brink sees it coming.** Dashboard, run 00 `pos`:
-   - the S3 signal drops;
-   - the alarm line;
-   - the shaded lead-time span before the behaviour breaks.
+   - the S3 signal drops to −12σ by step 4;
+   - the alarm is confirmed at step 8, the first evaluation that shows the break, 4 steps before a cheap judge;
 
    Drag the z-threshold slider: the alarm and lead time move live. Switch to `control`: no alarm.
 3. **(45 s) Where it breaks.** Layers tab: the erosion concentrates around the monitored layer.
@@ -108,8 +116,8 @@ ahead, so it finishes during the demo. If anything goes wrong, the tab shows the
    - The benign samples the gate flags break safety faster than random ones.
 5. **(60 s) Repair while training.** Run 02 trade-off plot: the erosion guard against no repair, ReSta and
    steering, on safety and task loss.
-6. **(30 s) Beyond English.** Run 03: which language breaks first, and how much earlier the worst-language
-   alarm fires.
+6. **(30 s) Beyond English.** Run 03: every language breaks, each language's own alarm catches it, and the
+   open problem: non-English alarms need their own calibration.
 7. **(15 s) Close.** One quantity, J: gate, monitor, repair. Open code, artifacts on the Hub, upstream feedback
    for five Lexsi toolkits.
 
@@ -123,8 +131,8 @@ Tiny Aya run; a Kaggle notebook with `--share` also serves the app on a GPU.
 |---|---|---|
 | 0:00–0:15 | Title, then the ASR cliff | "Fine-tune a safe model and its refusals can quietly collapse. You only find out afterwards." |
 | 0:15–0:30 | *Run Brink* tab, sped up: stages completing, verdict | "Here is Brink doing its whole job on Tiny Aya: same data, same model, with and without Brink." |
-| 0:30–0:45 | Signal dropping, alarm, lead span | "Brink watches the model's refusal mechanism itself, in one cheap forward pass, and fires ⟦RESULT⟧ steps before behaviour breaks." |
+| 0:30–0:45 | Signal dropping, alarm | "Brink reads the model's refusals every few steps. It raised its alarm the moment behaviour broke, four steps before a cheap judge would, and never on safe fine-tuning." |
 | 0:45–1:05 | Gate tab | "The same measure, applied to data before training, finds the samples that cause the damage." |
 | 1:05–1:30 | Repair trade-off plot | "When the alarm fires, Brink rolls back and guards training so it can't erode refusal, keeping task performance. It beats repairing afterwards." |
-| 1:30–1:45 | Multilingual plot | "And it watches every language, because English-only safety checks miss where models break first." |
+| 1:30–1:45 | Multilingual plot | "Safety breaks in every language, and Brink can watch each one, though outside English its alarm still needs calibrating." |
 | 1:45–2:00 | Stack logos, GitHub, Space | "Built on Tiny Aya and Lexsi's open stack. Code, results and the live monitor are open." |

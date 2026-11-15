@@ -87,9 +87,9 @@ def _tile(k: str, v: str, d: str = "", cls: str = "") -> str:
 
 def _lead_tile(lead) -> str:
     if lead is None:
-        return _tile("Lead time", "—", "alarm before behaviour breaks")
+        return _tile("Lead time", "—", "steps from alarm to behaviour break")
     if lead >= 0:
-        return _tile("Lead time", f"{lead} steps", "alarm before behaviour breaks")
+        return _tile("Lead time", f"{lead} steps", "steps from alarm to behaviour break")
     return _tile("Lead time", f"{-lead} steps late", "alarm after behaviour broke")
 
 
@@ -197,8 +197,8 @@ def build(results_root: Path, label_root: Path | None = None) -> gr.Blocks:
     with gr.Blocks(title="Brink") as demo:
         gr.HTML(
             '<div class="brink-root brink-header"><h1>Brink · keep a model safe while you fine-tune it</h1>'
-            "<p>Gates risky training data, watches the model's refusal mechanism during fine-tuning, raises "
-            "the alarm before behaviour breaks and repairs the damage.</p></div>"
+            "<p>Gates risky training data, watches the model's refusals during fine-tuning, raises "
+            "the alarm as they slip and repairs the damage.</p></div>"
         )
         dark = gr.Checkbox(False, label="Dark mode", render=False)  # shown at the bottom, used by every tab
         dark.change(None, dark, None, js="(d) => { document.body.classList.toggle('dark', d); }")

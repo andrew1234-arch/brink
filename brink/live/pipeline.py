@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from brink.live.config import LiveConfig, has_gpu
@@ -245,7 +245,7 @@ def release_memory() -> None:
 def _run(cfg, out, data, loader, judge, should_stop, st) -> dict:
     import numpy as np
 
-    from brink.data import tokenize_sft
+    from brink.data import sft_max_len, tokenize_sft
     from brink.eval.behavioral import KeywordJudge
     from brink.gate.scorer import GateScorer
     from brink.io import CsvLog, write_json
@@ -272,8 +272,18 @@ def _run(cfg, out, data, loader, judge, should_stop, st) -> dict:
         set_seed(cfg.seed)
         st.log(f"loading {cfg.model_id}")
         model, tok = loader()
-        # Samples whose prompt alone exceeds max_len can't be trained or scored: drop them up front.
+        # cfg.max_len is the budget for the sample itself, on top of what the chat template adds.
+        cfg = replace(cfg, max_len=sft_max_len(tok, cfg.max_len))
+        # Samples whose prompt alone exceeds max_len can't be trained or scored: drop them up front, but never
+        # quietly shrink the experiment.
         keep = [i for i, p in enumerate(data.train) if tokenize_sft(tok, [p], cfg.max_len)]
+        if len(keep) < len(data.train):
+            st.log(f"{len(data.train) - len(keep)} of {len(data.train)} samples are too long for max_len, dropped")
+        if len(keep) < 0.9 * len(data.train):
+            raise ValueError(
+                f"only {len(keep)} of {len(data.train)} fine-tuning samples fit in max_len={cfg.max_len} tokens; "
+                "raise max_len"
+            )
         data.train, data.train_harmful = [data.train[i] for i in keep], [data.train_harmful[i] for i in keep]
         fp, _ = calibrate(
             model,

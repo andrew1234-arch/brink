@@ -232,7 +232,9 @@ def reply_states(model, tok, pairs: list[Pair], layer: int, max_len: int = 1024,
             b = {k: v.to(device) for k, v in b.items()}
             reply = (b.pop("labels") != -100).float()
             with _autocast(device):
-                out = model(**b, output_hidden_states=True, use_cache=False)
+                # Only hidden states are needed: skip the logits, which for a large vocabulary are the biggest
+                # tensor of the forward pass (Tiny Aya's ran a T4 out of memory here).
+                out = model(**b, output_hidden_states=True, use_cache=False, logits_to_keep=1)
             h = out.hidden_states[layer].float()
             rows.append(((h * reply[..., None]).sum(1) / reply.sum(1, keepdim=True).clamp(min=1)).cpu())
     finally:

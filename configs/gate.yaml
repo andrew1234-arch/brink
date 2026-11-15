@@ -32,7 +32,7 @@ gate:
   lora_r: 8
   lora_alpha: 16
   max_len: 1024
-  batch_size: 4
+  batch_size: 1            # one sample per backward pass: keeps Tiny Aya's large-vocabulary logits small on a T4
   classifier_baseline: true   # WildGuard over every training pair (needs 2 GPUs)
 
 select:
@@ -42,7 +42,7 @@ eval:
   steps: [0, 24, 48, 96]
   max_new_tokens: 128
   batch_size: 16
-  loss_batch_size: 4
+  loss_batch_size: 2
 
 judge:
   kind: auto
@@ -55,8 +55,8 @@ train:
   max_steps: 96            # 3 epochs over 256 samples at effective batch 8
   lr: 1.0e-4
   warmup_steps: 4
-  micro_batch: 2
-  grad_accum: 4
+  micro_batch: 1  # Tiny Aya's vocabulary is large: keep each batch's logits small on a T4
+  grad_accum: 8            # same effective batch (8) as go / no-go
   max_len: 1024
   lora_r: 16
   lora_alpha: 32
