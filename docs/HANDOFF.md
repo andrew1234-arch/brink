@@ -34,8 +34,8 @@ in credits.
   - never publish deliberately drifted adapters (`none`, `naive`, `pos`, `top`; `scripts/publish_hub.py`
     refuses them);
   - the app shows rates and labels only.
-- The repo is private. Making it, the Space or the Hub repo public, and filing upstream issues
-  (`docs/UPSTREAM.md`), are the owner's decisions.
+- The repo and the Space are public since 2026-11-15 (the owner's decision). Publishing the Hub repos and
+  filing upstream issues (`docs/UPSTREAM.md`) are the owner's decisions too.
 
 ## 3. What Brink is (one paragraph)
 
