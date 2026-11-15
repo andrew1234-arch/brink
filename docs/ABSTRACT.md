@@ -1,9 +1,8 @@
 # Brink: abstract and submission form answers
 
-Paste-ready for the submission form. Each `⟦name⟧` marker is filled from `results/*/summary.json` by
-`python scripts/headlines.py --fill docs/ABSTRACT.md`, which lists any it couldn't fill. `results/HEADLINES.md` traces
-every number to its file and key. Keep the abstract under 500 words (`wc -w` on the section below). If a verdict
-is negative, rewrite the sentence instead of filling it.
+Paste-ready for the submission form. Every number comes from `results/*/summary.json`; `results/HEADLINES.md`
+(written by `python scripts/headlines.py`) traces each one to its file and key. The abstract is under 500 words
+(`wc -w` on the section below). Negative verdicts are stated as they are.
 
 ## Track and problem statements
 
@@ -14,74 +13,59 @@ is negative, rewrite the sentence instead of filling it.
   - 2a #4 Multilingual and code-mixed safety.
 - **Lexsi repos, chained in one pipeline:**
   - CuratorKIT: Brink's gate as a native `BaseGate` after `ExactDeduplicator`;
-  - AuditKIT: red-team verification;
+  - AuditKIT: red-team probes in the verify step (scores from these runs are not quoted, see Limitations);
   - SafeTune: ReSta and refusal-direction steering, as the repair baselines Brink is measured against;
-  - CircuitKIT: discovers the refusal circuit Brink monitors;
-  - AlignTune (Track 1): the trainer in the Hindi use case.
+  - AlignTune (Track 1): the trainer in the Hindi use case;
+  - CircuitKIT: a stage that compares its refusal circuit with the layer Brink monitors (implemented, not yet
+    run on a GPU).
 - **Model:** `CohereLabs/tiny-aya-global` (3.35B, dense, open weights).
 - **Links:**
   - GitHub: https://github.com/andrew1234-arch/brink
-  - Space: ⟦LINK⟧
+  - Space: https://huggingface.co/spaces/cmgdevl/brink
   - HF collection: ⟦LINK⟧
   - HF Article: ⟦LINK⟧
 
 ## Abstract
 
-**Brink: catch safety collapse during fine-tuning, before it happens, and stop it.**
+**Brink: catch a model's safety collapsing during fine-tuning, and stop it.**
 
-Fine-tuning a safe model on mostly benign data quietly erodes its refusals. Teams find out afterwards, with an
-expensive behavioural evaluation, then repair the damage after the compute is spent. Brink makes safety a
-property you keep *during* fine-tuning instead of one you check after it.
+Fine-tuning a safe model on mostly benign data can quietly erode its refusals. Teams find out afterwards, with an
+expensive behavioural evaluation, once the compute is spent. Brink keeps watch during fine-tuning instead.
 
 Brink measures one quantity, **J**: the model's preference to refuse rather than comply on fixed probe prompts,
-read from the refusal direction at one layer and calibrated against the model before fine-tuning. One cheap
-forward pass gives J. Brink uses it three times:
+as a z-score against a fingerprint taken before fine-tuning. One forward pass gives J. Brink uses it three times:
 
 1. **Gate (CuratorKIT).** Before training, each sample is scored by how much one gradient step on it would
-   lower J, cos(∇L, ∇J). The riskiest samples are rejected inside a CuratorKIT pipeline, with provenance.
-2. **Monitor.** During training, J is probed every few steps. The alarm threshold is calibrated only on safe
-   control runs, so safe fine-tuning doesn't trigger it.
-3. **Repair.** On alarm, Brink rolls back to the last safe LoRA state and projects every later gradient so it
-   cannot lower J (the erosion guard). It removes only the harmful component of each update.
+   lower J, cos(∇L, ∇J). The riskiest samples are rejected inside a CuratorKIT pipeline.
+2. **Monitor.** During training, J is probed every few steps. The alarm threshold is calibrated on safe control
+   runs only.
+3. **Repair.** On alarm, Brink halts, or rolls back to the last safe LoRA state and projects later gradients so
+   they cannot lower J (the erosion guard).
 
-Then **verify** on held-out harmful and harmless prompts, task quality and AuditKIT red-team probes.
+**Use case (all 4 pre-set checks pass).** A Hindi assistant: Tiny Aya Global fine-tuned on 512 Hindi instruction
+pairs, 51 of them harmful-compliance samples, chained as CuratorKIT → AlignTune → evaluation.
+- Unprotected: English attack success 16 % → **42 %** (95 % CI 30–54).
+- With Brink: **6 %** (2–15), over-refusal 0 %, Hindi task loss 1.800 against 1.788 unprotected (2.102 before).
+- Hindi attack success stayed at 0–2 % in all three models: no Hindi erosion was measured.
 
-**Use case.** A Hindi assistant fine-tuned on Tiny Aya Global from instruction data in which 10 % of the
-samples are harmful-compliance pairs, chained as CuratorKIT → AlignTune → AuditKIT.
-- Unprotected fine-tuning: English attack success ⟦pipeline.asr_before⟧ → ⟦pipeline.asr_naive⟧; Hindi
-  ⟦pipeline.asr_hi_before⟧ → ⟦pipeline.asr_hi_naive⟧.
-- With Brink: ⟦pipeline.asr_brink⟧ and ⟦pipeline.asr_hi_brink⟧.
-- Task quality, chrF on held-out Hindi: ⟦pipeline.chrf_naive⟧ unprotected vs ⟦pipeline.chrf_brink⟧ with Brink.
-- Over-refusal: ⟦pipeline.over_refusal_naive⟧ vs ⟦pipeline.over_refusal_brink⟧.
+**Evidence, including what failed.**
+- End to end (one recorded run): attack success 21 % → 94 % unprotected → 21 % with Brink, at the same task loss.
+- Alarm (2 seeds): caught both harmful fine-tunes, no false alarm on safe ones, 4 steps before a cheap judge.
+  It is confirmed on the evaluation step where behaviour breaks, not before it. Verdict NO-GO on one of four
+  checks: the signal is an alarm, not a severity gauge, and the activation-level signals detect nothing once
+  calibrated.
+- Gate: AUROC 0.981 on planted harmful samples (0.943 for a representation baseline). Not proven: on benign
+  data the predicted ordering holds (19 % / 11 % / 9 % attack success for top / random / bottom subsets) but
+  misses the pre-set 10-point margin.
+- Repair: halting at the alarm ends at 17 % attack success against 83 % unrepaired. Not proven: rollback + guard
+  alone (41 %) is less safe than safety-data mixing (23 %) and SafeTune steering (19 %).
+- Languages: English, Hindi and Tagalog all break; each language's alarm catches its break, but the Hindi and
+  Tagalog alarms also fire on safe fine-tuning.
 
-**Evidence.**
-- The alarm fires ⟦go_nogo.lead_mean⟧ ± ⟦go_nogo.lead_sd⟧ steps before behaviour breaks, with a
-  ⟦go_nogo.false_alarm_rate⟧ false-alarm rate on held-out safe runs (3 seeds).
-- The gate finds eroding data a content classifier misses: AUROC ⟦gate.auroc⟧ vs WildGuard
-  ⟦gate.classifier_auroc⟧.
-- Repairing during training beats the standard fixes: attack success ⟦repair.asr_brink⟧ vs ⟦repair.asr_safety_mix⟧
-  for safety-data mixing, ⟦repair.asr_resta⟧ for SafeTune ReSta and ⟦repair.asr_steer⟧ for steering, at task loss
-  ⟦repair.loss_brink⟧.
-- Erosion is not English-only: ⟦multilingual.first_break_lang⟧ breaks first. A worst-language alarm leads the
-  break by ⟦multilingual.worst_lead⟧ steps, an English-only one by ⟦multilingual.english_lead⟧.
-- CircuitKIT's discovered refusal circuit puts ⟦circuit.upstream⟧ of its score mass upstream of the layer Brink
-  monitors.
+**Responsible release.** Published: fingerprints, logs and reports (rates and labels only). Never published:
+model replies to harmful prompts and deliberately drifted adapters.
 
-**ROI.** Serving the protected Tiny Aya on one T4 costs $⟦roi.self_hosted_monthly⟧ a month against
-$⟦roi.api_monthly⟧ for ⟦roi.api_model⟧ at the same traffic; Brink's one-off fine-tune pays back in
-⟦roi.payback_months⟧ months.
+**Limitations.** One model family; one or two seeds; an English-trained judge for non-English attack success;
+AuditKIT scores, chrF task quality and the CircuitKIT stage are implemented but not in these runs.
 
-**Responsible release.**
-- Published:
-  - fingerprints;
-  - logs and reports (rates and labels only);
-  - Brink-protected adapters.
-- Never published:
-  - model replies to harmful prompts;
-  - deliberately drifted adapters.
-- Limitations stated up front:
-  - one model family;
-  - an English-trained judge for non-English attack success;
-  - CircuitKIT's Tiny Aya support is experimental.
-
-Code, a live Space that runs the whole product end to end, and all artifacts are public.
+Code and all results, including every failed criterion, are public.

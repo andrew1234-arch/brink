@@ -1,6 +1,6 @@
 # Handoff: where Brink stands and what's left
 
-Read this first. It is the single source of truth for picking the project up. Last updated 2026-11-12.
+Read this first. It is the single source of truth for picking the project up. Last updated 2026-11-15.
 
 ## 1. The goal
 
@@ -10,7 +10,7 @@ entry by Cmg (GitHub `andrew1234-arch`).
 | Date | What |
 |---|---|
 | Nov 5 | Registration closed (we're registered) |
-| **Nov 14** | **Submission deadline** |
+| **Nov 15, 11:59 PM AoE** (Nov 16, 11:59 UTC) | **Submission deadline** (moved from Nov 14; hackathon.lexsi.ai, read 2026-11-15) |
 | Nov 16 | Up to 20 teams shortlisted |
 | Nov 22 | Demo Day |
 
@@ -109,21 +109,27 @@ Gotchas:
 - transformers 5 records `hidden_states` before user hooks run. The steering code measures with a forward
   pre-hook on layer l* for that reason.
 
-## 6. Status (2026-11-12)
+## 6. Status (2026-11-15)
 
 | Area | State |
 |---|---|
-| Library, 7 stages, app, CI, Space deploy pipeline, docs | **Done.** Tested offline; CI green on `main` |
-| Real GPU runs | **Running** since 2026-11-12 09:15 UTC: Kaggle `cmgdevl/brink-run-all`, all stages, 11 h session budget, expected to finish around 20:00 UTC. go_nogo **done 12:27 UTC, verdict NO-GO on G2 only** (G1a, G1b, G3 pass). Harmful runs: ASR 16 % → 97–100 %, break at step 8; control runs: ASR flat (16 % → 11–12 %). S3 alarm: 100 % detection, 0 false alarms (leave-one-seed-out), confirmed at step 8 (lead 0 at eval resolution; z −12σ already at step 4), 4 steps before a cheap judge checking every probe step. G2 fails because S3–ASR Spearman is −0.38 / −0.62 (needs |ρ| ≥ 0.7): it is −1.0 over steps 0–24 while ASR moves, then ASR sits at ~98 % and S3 rebounds part-way, so S3 is an alarm, not a gauge of how broken the model is. The mechanistic signals S1 / S2 also fall on control and detect nothing after calibration. Don't relax G2 after the fact; report it as is. **pipeline FAILED at 12:30 UTC** within ~3 min, right after the step-0 probe of the first condition (`naive`, AlignTune / TRL trainer on GPU). The same test passes on CPU, so the cause is GPU-only and not known yet: the Kaggle log is readable only after the session ends. Experiments now write `ERROR.md` with the traceback (from the next run on). The pipeline must be re-run in a new session. **live done 12:54 UTC but must be re-run:** `max_len: 384` ignored Tiny Aya's long chat-template preamble, so 90 of 128 samples (29 of 32 harmful) were dropped before training; it trained on 38 (3 harmful). Its numbers (refusal 77 % → 35 % unprotected, 94 % with Brink; task loss 1.98 → 2.97 / 3.68, likely over-fitting 28–38 samples) are not the demo's. Fixed: `max_len` is now a budget on top of the template (`brink.data.sft_max_len`), and a live run whose samples mostly don't fit fails instead of shrinking. The notebook's `RERUN = ["live"]` redoes it next session; empty `RERUN` after that run. **Session ended 16:35 UTC (7 h 51 min GPU).** Final: go_nogo done, live done (re-run, see above), multilingual done, **pipeline / gate / repair FAILED, all CUDA out of memory** (confirmed in the Kaggle log): pipeline in TRL's `entropy_from_logits` at step 1; gate after scoring all 2000 samples, in the representation baseline `reply_states` (full logits computed for nothing); repair in the training loss at step ~116 (micro-batch 2 × 1024). Fixed for the next run: micro_batch 1 × grad_accum 8, gate batch_size 1, eval loss_batch_size 2, `logits_to_keep=1` in `reply_states`, `expandable_segments` in the notebook. Multilingual: per-language S3 catches every break (tl 4 steps early; hi, en on the break step) but **false-alarms on hi / tl control** (z −7.7 / −9.2 at step 20, fixed −3 threshold, ASR fell to 0 %): the non-English signal is noisier, so say so and don't claim a calibrated multilingual alarm. **Nov 13:** the next run (version 8 on Kaggle, saved) is not started yet: it must be started from the Kaggle UI. README, SUBMISSION (00 and 03 rows, one-liner, limitations, demo and video script), ARCHITECTURE, pyproject, CITATION and the app header now state the finished results as they are: no "before behaviour breaks" or "internal signal" claims. **Nov 14 run** (started 08:10 UTC, code with the memory fixes): pipeline FAILED 08:45 UTC, out of memory again, but later: the unprotected condition trained fully through AlignTune (30 min, alarm at step 16), then the Brink condition's gate loaded a second Tiny Aya while the first condition's AlignTune trainer still held the GPU (one process). Fixed: each condition trains in its own subprocess (`pipeline.py train --condition`). The notebook's `RERUN` is empty again and each stage deletes its stale `ERROR.md` before running. The pipeline needs one more session after this one (~2.5 h). **live re-run done 09:12 UTC** (all 128 samples): ASR 21 % → 94 % unprotected → 21 % with Brink, refusal 77 % → 4 % → 69 %, over-refusal 0 %, task loss 2.016 → 1.452 → 1.462; gate caught 29 / 32 (precision 91 %); no alarm on the Brink run (the gate did the work). Plan A (user's choice): cancel this session after live and start version 11 (pipeline → gate → repair). Deadline: end of day Nov 14. The first attempt failed in every stage on Kaggle's torchao 0.10 (fixed: the notebook uninstalls it) |
-| Kaggle GPU quota | **30 h / week** since Nov 12 (it was 6 h until then); resets Fridays 00:00 UTC |
-| HF Space | **Not deployed.** `HF_SPACE_ID` isn't set, so the deploy job is skipped |
-| Write-up numbers | 7 `⟦RESULT⟧` markers in `docs/SUBMISSION.md`; README says "Results: pending" |
-| Rubric scorecard | `docs/SCORECARD.md`: requirements and problem statements from hackathon.lexsi.ai, scored. **Re-score it at each milestone and on Nov 13** |
-| Branch `rubric-gaps` | **Merged into `main` on 2026-11-12, after the 09:15 session had cloned `main`.** Closes scorecard gaps: CuratorKIT + AuditKIT inside *Run Brink* and *Gate your data*; the AuditKIT scoring fix; chrF task-quality metric; CircuitKIT stage (`circuit`, last in the notebook); ROI calculator; public dataset repo + HF collection in `publish_hub.py`; `docs/ABSTRACT.md`, `docs/ARTICLE.md`, `docs/CIRCUIT.md` |
-| What the 2026-11-12 session can't give | It runs the pre-merge code: no `circuit` stage, no chrF in pipeline, and **wrong AuditKIT red-team numbers in pipeline and repair** (see Step 2). Next session (quota resets Fri Nov 13 00:00 UTC): run `circuit`, and re-run pipeline after removing `results/pipeline` from `results/all` (finished stages are skipped) |
-| Repo About | Set on 2026-11-12 with `gh repo edit` (description + 12 topics). Website is empty until the Space is deployed |
+| Code on `main` | `rubric-gaps` and the Nov 12–14 fixes are merged (2026-11-15). Before that, `rubric-gaps` had only been merged locally and never pushed, so **every Kaggle run so far used code without it** |
+| GPU runs | **All six stages finished** on `results/all` (last: repair, 2026-11-14 16:48 UTC). Verdicts: go_nogo NO-GO (G2 only), pipeline DELIVERS (4 of 4), gate NOT PROVEN (D2: 8 points, needs 10), repair NOT PROVEN (R4: rollback + guard 41 % vs safety mix 23 %; halt 17 %), multilingual done (hi / tl false alarms on control), live done. The result files are also in `results/` on `main` |
+| Not in these runs | The `circuit` stage, chrF in the pipeline, and correctly scored AuditKIT numbers (the runs used AuditKIT's default detectors; don't quote `redteam_*` / "attacks resisted"). No adapters were published, and Kaggle deletes them when a session ends |
+| Write-up | Filled with the real numbers, negative verdicts included: `README.md`, `docs/SUBMISSION.md`, `docs/ABSTRACT.md` (under 500 words), `docs/ARTICLE.md` (follows the site's required write-up sections). `results/HEADLINES.md` traces each number |
+| HF Space | Hugging Face refuses a Gradio Space on free hardware without a PRO account (402). The deploy now falls back by itself to a free **static results page** (reports, plots, logs; no live tabs), and a Space deployed as static stays static. To deploy the Gradio app after getting PRO, the workflow must pass `HF_SPACE_SDK=gradio`: that edit, and a manual `publish-hub.yml` workflow, are on the local branch `with-workflows`, which needs a GitHub token with the `workflow` scope to push (`gh auth refresh -s workflow`) |
+| Hub artifacts and collections | **Not published.** `scripts/publish_hub.py` needs an HF write token |
+| ROI | Not done: `configs/roi.yaml` needs real prices with sources, and the serving speed comes from a pipeline run on the merged code |
+| Kaggle GPU quota | 30 h / week, resets Fridays 00:00 UTC |
+| Repo About | Description and topics set on 2026-11-12. Website still to set once the Space is up |
 
-**Critical path:** run the experiments → check and fix → fill in the numbers → deploy → submit by Nov 14.
+**Critical path:** push `main` → deploy the Space → publish the Hub collections → make the repo public → post the
+article → submit by Nov 15, 11:59 PM AoE.
+
+**Optional, about 2.5 h of Kaggle GPU:** one more session for `circuit` and a pipeline re-run (`RERUN =
+["pipeline"]`) gives the CircuitKIT result, chrF and correct AuditKIT numbers. The Kaggle copy of the notebook
+must first be replaced with `notebooks/kaggle_run_all.ipynb` from `main`. If the re-run fails, restore
+`results/pipeline` from commit `99f37f1` on `results/all`.
 
 **Rules that change the plan** (hackathon.lexsi.ai, read 2026-11-06):
 - Projects "must be deployed publicly". All models, adapters, logs and datasets must be in a public, un-gated HF
@@ -135,7 +141,7 @@ Gotchas:
 
 ## 7. What's left, step by step
 
-### Step 1: run the experiments on Kaggle (session 1 running on Nov 12; session 2 on Nov 13 for `circuit` and the pipeline re-run)
+### Step 1: run the experiments on Kaggle (done for six stages; `circuit` and a pipeline re-run are optional)
 
 1. On Hugging Face, with the account whose token you'll use, accept the terms of:
    `CohereLabs/tiny-aya-global`, `CohereLabs/tiny-aya-base`, `allenai/wildguard`, `walledai/AdvBench`,
@@ -193,17 +199,13 @@ criteria are in each experiment doc: `docs/GO_NOGO.md` ("Pass criteria (all must
   finished conditions are skipped.
 - Fix bugs on `main` with tests. The notebook clones `main` on each run.
 
-### Step 3: fill in the numbers
+### Step 3: fill in the numbers (done on 2026-11-15)
 
-- Run `python scripts/headlines.py --fill docs/ABSTRACT.md`. It writes `results/HEADLINES.md` (every headline number
-  with its source file and key) and fills the abstract's named markers, listing any it can't fill. Copy numbers
-  into the other docs from `HEADLINES.md`.
-- `docs/SUBMISSION.md`: replace every `⟦RESULT⟧` (lines ~47-51 and the video script, ~line 126) with numbers
-  from the `summary.json` files. Every number must trace back to a file in `results/`.
-- `README.md`: replace "**Results:** pending the GPU runs…" (~line 116) with a short results table: before
-  and after, unprotected vs Brink, with CIs where the analysis gives them.
-- Each experiment doc (`docs/GO_NOGO.md` etc.): add the headline result and the plot (`results/<stage>/*.png`).
-- To add result files to `main`, copy them from `results/all` (`git checkout FETCH_HEAD -- results/<stage>`).
+- The numbers are written into `README.md`, `docs/SUBMISSION.md`, `docs/ABSTRACT.md` and `docs/ARTICLE.md`.
+  Every number must trace back to a file in `results/`; `python scripts/headlines.py` rewrites
+  `results/HEADLINES.md` with the source file and key of each.
+- After a new run, update those four files by hand from `HEADLINES.md`. If a verdict is negative, say so.
+- To add result files to `main`, copy them from `results/all` (`git checkout origin/results/all -- results`).
   `results/.gitignore` keeps only csv / json / md / png.
 
 ### Step 4: deploy the Space
@@ -252,7 +254,7 @@ run this at the end of the session, or the adapters are lost when it ends.
 Fill in the prices in `configs/roi.yaml`, each with its source and date, then run `python scripts/roi.py`. It
 reads the serving speed measured in stage 04 and writes `results/ROI.md`.
 
-### Step 6: submit (by Nov 14)
+### Step 6: submit (by Nov 15, 11:59 PM AoE)
 
 - Submission text: `docs/SUBMISSION.md`, with the claims table, what was built and the limitations.
 - Links: GitHub repo, HF Space, HF Hub artifacts repo.

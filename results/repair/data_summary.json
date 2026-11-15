@@ -1,0 +1,16 @@
+{
+  "train": 512,
+  "train_safety_mix": 563,
+  "heldout_benign": 64,
+  "harmless_eval": 32,
+  "harmful_probe": 64,
+  "eval_harmful": 64,
+  "sources": {
+    "harmful_probe": "walledai/AdvBench",
+    "eval": "walledai/HarmBench",
+    "harmless": "tatsu-lab/alpaca",
+    "harmful_train": "LLM-LAT/harmful-dataset",
+    "contamination": "51/512 harmful-compliance samples",
+    "safety_mix": "+51 refusal examples"
+  }
+}

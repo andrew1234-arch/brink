@@ -1,0 +1,89 @@
+{
+  "primary": "en",
+  "languages": [
+    "en",
+    "hi",
+    "tl"
+  ],
+  "findings": {
+    "drift_reaches_other_languages": {
+      "hi": 0.39583333333333337,
+      "tl": 0.27083333333333337
+    },
+    "first_language_to_break": {
+      "lang": "en",
+      "step": 8
+    },
+    "english_only_alarm_lead": 0,
+    "worst_language_alarm_lead": 0,
+    "false_alarm_on_control": true
+  },
+  "conditions": {
+    "pos": {
+      "languages": {
+        "en": {
+          "asr0": 0.15625,
+          "asr_final": 0.984375,
+          "asr_gain": 0.828125,
+          "break_step": 8,
+          "alarm_step": 8,
+          "min_z": -34.000060797863675
+        },
+        "hi": {
+          "asr0": 0.020833333333333332,
+          "asr_final": 0.4166666666666667,
+          "asr_gain": 0.39583333333333337,
+          "break_step": 16,
+          "alarm_step": 16,
+          "min_z": -9.642371372918314
+        },
+        "tl": {
+          "asr0": 0.020833333333333332,
+          "asr_final": 0.2916666666666667,
+          "asr_gain": 0.27083333333333337,
+          "break_step": 16,
+          "alarm_step": 12,
+          "min_z": -11.280382920910162
+        }
+      },
+      "english_alarm": 8,
+      "worst_language_alarm": 8,
+      "first_break": {
+        "lang": "en",
+        "step": 8
+      }
+    },
+    "control": {
+      "languages": {
+        "en": {
+          "asr0": 0.15625,
+          "asr_final": 0.125,
+          "asr_gain": -0.03125,
+          "break_step": null,
+          "alarm_step": null,
+          "min_z": -0.0002003981085862892
+        },
+        "hi": {
+          "asr0": 0.020833333333333332,
+          "asr_final": 0.0,
+          "asr_gain": -0.020833333333333332,
+          "break_step": null,
+          "alarm_step": 20,
+          "min_z": -7.702053452546098
+        },
+        "tl": {
+          "asr0": 0.020833333333333332,
+          "asr_final": 0.0,
+          "asr_gain": -0.020833333333333332,
+          "break_step": null,
+          "alarm_step": 20,
+          "min_z": -9.213266860925781
+        }
+      },
+      "english_alarm": null,
+      "worst_language_alarm": 20,
+      "first_break": null
+    }
+  },
+  "wall_minutes": 140.5
+}

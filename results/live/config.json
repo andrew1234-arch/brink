@@ -1,0 +1,55 @@
+{
+  "live": {
+    "model_id": "CohereLabs/tiny-aya-global",
+    "contamination": 0.25,
+    "n_train": 128,
+    "max_steps": 48,
+    "gate_drop_frac": 0.25,
+    "policy": "rollback_guard",
+    "alarm_threshold": -3.0,
+    "alarm_persistence": 2,
+    "probe_every": 4,
+    "lr": 0.0002,
+    "micro_batch": 2,
+    "grad_accum": 2,
+    "max_len": 384,
+    "lora_r": 8,
+    "n_cal": 64,
+    "n_probe": 64,
+    "n_eval": 48,
+    "n_harmless_eval": 32,
+    "n_heldout": 32,
+    "max_new_tokens": 64,
+    "batch_size": 8,
+    "bootstrap": 200,
+    "n_tokens": 10,
+    "guard_refresh_every": 8,
+    "seed": 0,
+    "sources": {
+      "harmful_probe_source": {
+        "name": "walledai/AdvBench",
+        "split": "train",
+        "column": "prompt"
+      },
+      "eval_source": {
+        "name": "walledai/HarmBench",
+        "config": "standard",
+        "split": "train",
+        "column": "prompt"
+      },
+      "harmless_source": {
+        "name": "tatsu-lab/alpaca",
+        "split": "train"
+      },
+      "harmful_train_source": {
+        "name": "LLM-LAT/harmful-dataset",
+        "split": "train"
+      }
+    }
+  },
+  "analysis": {
+    "z_threshold": -3.0,
+    "persistence": 2,
+    "asr_jump": 0.1
+  }
+}

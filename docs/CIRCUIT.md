@@ -28,4 +28,4 @@ model's refusal mechanism actually is? CircuitKIT gives an independent answer.
 - CircuitKIT pins its own `transformers` and `transformer-lens`, so the notebook installs it only when this
   stage starts, after every other stage.
 
-**Result:** ⟦RESULT⟧
+**Result:** none yet. The stage is tested offline and has not run on a GPU.

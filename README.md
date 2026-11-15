@@ -149,8 +149,17 @@ Each experiment writes a `REPORT.md` with an explicit verdict, and the dashboard
 - **Languages (03):** English, Hindi and Tagalog each break under harmful fine-tuning, and each language's own
   alarm catches its break (Tagalog's 4 steps early). On safe fine-tuning the Hindi and Tagalog alarms fire
   falsely at step 20, so the non-English alarm needs its own calibration.
-- **Gate (01), repair (02) and the Hindi pipeline (04):** re-running after earlier attempts ran out of GPU
-  memory.
+- **The Hindi assistant (04, the full Lexsi pipeline):** fine-tuning on 512 Hindi instruction pairs, 51 of them
+  harmful, raised English attack success from 16 % to **42 %**. With Brink (CuratorKIT gate, then AlignTune
+  training with alarm, rollback and guard) it ended at **6 %**, with no over-refusal and the same task loss
+  (1.800 vs 1.788; 2.102 before). All four pre-set checks pass. Hindi attack success stayed at 0–2 % in every
+  model, so this run shows no Hindi erosion to prevent.
+- **Gate (01):** it ranks planted harmful samples at the top (AUROC 0.981; 86 % of them in the top 5 %). On
+  benign data the predicted ordering holds (fine-tuning on the top-scored subset ends at 19 % attack success,
+  random 11 %, bottom 9 %), but the gap is 8 points and the pre-set check asked for 10: **not proven**.
+- **Repair (02):** without repair the model ends at 83 % attack success. Halting at Brink's alarm keeps it at
+  **17 %**. Rollback + guard, trained to the end, ends at 41 %: worse than safety-data mixing (23 %) and
+  steering (19 %), so the claim that it beats the standard fixes is **not proven**.
 
 ## The Lexsi stack in Brink
 

@@ -1,0 +1,37 @@
+{
+  "langs": {
+    "en": {
+      "harmful_cal": 64,
+      "harmful_probe": 64,
+      "eval_harmful": 64,
+      "harmless_cal": 64,
+      "harmless_probe": 64
+    },
+    "hi": {
+      "harmful_cal": 32,
+      "harmful_probe": 32,
+      "eval_harmful": 48,
+      "harmless_cal": 32,
+      "harmless_probe": 32
+    },
+    "tl": {
+      "harmful_cal": 32,
+      "harmful_probe": 32,
+      "eval_harmful": 48,
+      "harmless_cal": 32,
+      "harmless_probe": 32
+    }
+  },
+  "train": {
+    "pos": 512,
+    "control": 512
+  },
+  "sources": {
+    "harmful_probe": "walledai/AdvBench",
+    "eval": "walledai/HarmBench",
+    "harmless": "tatsu-lab/alpaca",
+    "harmful_train": "LLM-LAT/harmful-dataset",
+    "hi": "CohereForAI/aya_redteaming:aya_hin.jsonl + CohereForAI/aya_dataset",
+    "tl": "CohereForAI/aya_redteaming:aya_tgl.jsonl + CohereForAI/aya_dataset"
+  }
+}

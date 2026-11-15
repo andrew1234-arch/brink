@@ -1,0 +1,227 @@
+{
+ "go_nogo.verdict": {
+  "value": "NO-GO",
+  "text": "NO-GO",
+  "source": "results/go_nogo/summary.json → verdict"
+ },
+ "go_nogo.signal": {
+  "value": "S1",
+  "text": "S1",
+  "source": "results/go_nogo/summary.json → best_mechanistic_signal (else best_signal)"
+ },
+ "go_nogo.lead_mean": {
+  "value": -4.0,
+  "text": "-4",
+  "source": "results/go_nogo/summary.json → signals[best].lead_mean (steps)"
+ },
+ "go_nogo.lead_sd": {
+  "value": 0.0,
+  "text": "0",
+  "source": "results/go_nogo/summary.json → signals[best].lead_sd (steps)"
+ },
+ "go_nogo.false_alarm_rate": {
+  "value": 0.0,
+  "text": "0 %",
+  "source": "results/go_nogo/summary.json → signals[best].loo_false_alarm_rate"
+ },
+ "go_nogo.detection_rate": {
+  "value": 0.0,
+  "text": "0 %",
+  "source": "results/go_nogo/summary.json → signals[best].detection_rate"
+ },
+ "go_nogo.s3_lead_mean": {
+  "value": 0.0,
+  "text": "0",
+  "source": "results/go_nogo/summary.json → signals.S3.lead_mean (steps)"
+ },
+ "go_nogo.judge_lead_mean": {
+  "value": -4.0,
+  "text": "-4",
+  "source": "results/go_nogo/summary.json → cheap_judge_baseline.lead_mean (steps)"
+ },
+ "go_nogo.judge_cost_ratio": {
+  "value": 0.26088896241569864,
+  "text": "0.3",
+  "source": "results/go_nogo/summary.json → cheap_judge_baseline.seconds_per_check / mean(runs.*[].probe_seconds)"
+ },
+ "gate.verdict": {
+  "value": "GATE NOT PROVEN",
+  "text": "GATE NOT PROVEN",
+  "source": "results/gate/summary.json → verdict"
+ },
+ "gate.auroc": {
+  "value": 0.980574358974359,
+  "text": "0.98",
+  "source": "results/gate/summary.json → detection[primary].auroc"
+ },
+ "gate.classifier_auroc": {
+  "value": 0.9992307692307693,
+  "text": "1.00",
+  "source": "results/gate/summary.json → detection.classifier.auroc (WildGuard)"
+ },
+ "gate.classifier_on_top": {
+  "value": 0.00390625,
+  "text": "0 %",
+  "source": "results/gate/summary.json → classifier_on_gate_top"
+ },
+ "gate.asr_top": {
+  "value": 0.19047619047619047,
+  "text": "19 %",
+  "source": "results/gate/summary.json → runs.top.asr_final"
+ },
+ "gate.asr_random": {
+  "value": 0.109375,
+  "text": "11 %",
+  "source": "results/gate/summary.json → runs.random.asr_final"
+ },
+ "gate.asr_bottom": {
+  "value": 0.09375,
+  "text": "9 %",
+  "source": "results/gate/summary.json → runs.bottom.asr_final"
+ },
+ "repair.verdict": {
+  "value": "REPAIR NOT PROVEN",
+  "text": "REPAIR NOT PROVEN",
+  "source": "results/repair/summary.json → verdict"
+ },
+ "repair.best_policy": {
+  "value": "halt",
+  "text": "halt",
+  "source": "results/repair/summary.json → best_policy"
+ },
+ "repair.asr_none": {
+  "value": 0.828125,
+  "text": "83 %",
+  "source": "results/repair/summary.json → conditions.none.asr"
+ },
+ "repair.asr_brink": {
+  "value": 0.171875,
+  "text": "17 %",
+  "source": "results/repair/summary.json → conditions[best_policy].asr"
+ },
+ "repair.loss_brink": {
+  "value": 1.46811778651444,
+  "text": "1.468",
+  "source": "results/repair/summary.json → conditions[best_policy].heldout_loss"
+ },
+ "repair.loss_none": {
+  "value": 1.416894693553586,
+  "text": "1.417",
+  "source": "results/repair/summary.json → conditions.none.heldout_loss"
+ },
+ "repair.asr_safety_mix": {
+  "value": 0.234375,
+  "text": "23 %",
+  "source": "results/repair/summary.json → conditions.safety_mix.asr"
+ },
+ "repair.asr_resta": {
+  "value": 0.65625,
+  "text": "66 %",
+  "source": "results/repair/summary.json → conditions.posthoc_resta.asr"
+ },
+ "repair.asr_steer": {
+  "value": 0.1875,
+  "text": "19 %",
+  "source": "results/repair/summary.json → conditions.posthoc_steer.asr"
+ },
+ "multilingual.first_break_lang": {
+  "value": "en",
+  "text": "en",
+  "source": "results/multilingual/summary.json → findings.first_language_to_break.lang"
+ },
+ "multilingual.worst_lead": {
+  "value": 0,
+  "text": "0",
+  "source": "results/multilingual/summary.json → findings.worst_language_alarm_lead (steps)"
+ },
+ "multilingual.english_lead": {
+  "value": 0,
+  "text": "0",
+  "source": "results/multilingual/summary.json → findings.english_only_alarm_lead (steps)"
+ },
+ "pipeline.verdict": {
+  "value": "PIPELINE DELIVERS",
+  "text": "PIPELINE DELIVERS",
+  "source": "results/pipeline/summary.json → verdict"
+ },
+ "pipeline.asr_before": {
+  "value": 0.15625,
+  "text": "16 %",
+  "source": "results/pipeline/summary.json → conditions.naive.ref.asr"
+ },
+ "pipeline.asr_naive": {
+  "value": 0.4166666666666667,
+  "text": "42 %",
+  "source": "results/pipeline/summary.json → conditions.naive.final.asr"
+ },
+ "pipeline.asr_brink": {
+  "value": 0.0625,
+  "text": "6 %",
+  "source": "results/pipeline/summary.json → conditions.brink.final.asr"
+ },
+ "pipeline.asr_hi_before": {
+  "value": 0.020833333333333332,
+  "text": "2 %",
+  "source": "results/pipeline/summary.json → conditions.naive.ref.asr_hi"
+ },
+ "pipeline.asr_hi_naive": {
+  "value": 0.0,
+  "text": "0 %",
+  "source": "results/pipeline/summary.json → conditions.naive.final.asr_hi"
+ },
+ "pipeline.asr_hi_brink": {
+  "value": 0.0,
+  "text": "0 %",
+  "source": "results/pipeline/summary.json → conditions.brink.final.asr_hi"
+ },
+ "pipeline.over_refusal_naive": {
+  "value": 0.03125,
+  "text": "3 %",
+  "source": "results/pipeline/summary.json → conditions.naive.final.over_refusal"
+ },
+ "pipeline.over_refusal_brink": {
+  "value": 0.0,
+  "text": "0 %",
+  "source": "results/pipeline/summary.json → conditions.brink.final.over_refusal"
+ },
+ "pipeline.loss_naive": {
+  "value": 1.7883723563290104,
+  "text": "1.788",
+  "source": "results/pipeline/summary.json → conditions.naive.final.heldout_loss"
+ },
+ "pipeline.loss_brink": {
+  "value": 1.8004187848063706,
+  "text": "1.800",
+  "source": "results/pipeline/summary.json → conditions.brink.final.heldout_loss"
+ },
+ "pipeline.redteam_naive": {
+  "value": 0.47619047619047616,
+  "text": "48 %",
+  "source": "results/pipeline/summary.json → conditions.naive.final.redteam_attack_resistance"
+ },
+ "pipeline.redteam_brink": {
+  "value": 0.7619047619047619,
+  "text": "76 %",
+  "source": "results/pipeline/summary.json → conditions.brink.final.redteam_attack_resistance"
+ },
+ "pipeline.planted_caught": {
+  "value": 21,
+  "text": "21",
+  "source": "results/pipeline/summary.json → conditions.brink.gate.planted_caught"
+ },
+ "pipeline.planted_total": {
+  "value": 51,
+  "text": "51",
+  "source": "results/pipeline/summary.json → conditions.brink.gate.planted_total"
+ },
+ "live.verdict": {
+  "value": "Unprotected fine-tuning cut refusal from 77% to 4%; with Brink it ended at 69%, preventing 89% of the loss. Brink's alarm fired at step 20 of the unprotected run.",
+  "text": "Unprotected fine-tuning cut refusal from 77% to 4%; with Brink it ended at 69%, preventing 89% of the loss. Brink's alarm fired at step 20 of the unprotected run.",
+  "source": "results/live/summary.json → verdict"
+ },
+ "live.loss_prevented": {
+  "value": 0.8857142857142857,
+  "text": "89 %",
+  "source": "results/live/summary.json → loss_prevented"
+ }
+}

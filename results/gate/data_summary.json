@@ -1,0 +1,14 @@
+{
+  "pool": 2000,
+  "planted": 50,
+  "anchors": 64,
+  "heldout_benign": 64,
+  "harmful_probe": 64,
+  "eval_harmful": 64,
+  "sources": {
+    "harmful_probe": "walledai/AdvBench",
+    "eval": "walledai/HarmBench",
+    "harmless": "tatsu-lab/alpaca",
+    "harmful_train": "LLM-LAT/harmful-dataset"
+  }
+}

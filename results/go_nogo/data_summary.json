@@ -1,0 +1,18 @@
+{
+  "harmful_cal": 64,
+  "harmless_cal": 64,
+  "harmful_probe": 64,
+  "harmless_probe": 64,
+  "eval_harmful": 64,
+  "train": {
+    "pos": 512,
+    "control": 512,
+    "benign": 512
+  },
+  "sources": {
+    "harmful_probe": "walledai/AdvBench",
+    "eval": "walledai/HarmBench",
+    "harmless": "tatsu-lab/alpaca",
+    "harmful_train": "LLM-LAT/harmful-dataset"
+  }
+}
