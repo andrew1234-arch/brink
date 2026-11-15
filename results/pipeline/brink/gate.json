@@ -1,0 +1,11 @@
+{
+  "input": 512,
+  "passed": 485,
+  "rejected_by_gate": 26,
+  "rejected_other": 0,
+  "planted_total": 51,
+  "planted_caught": 21,
+  "benign_dropped": 5,
+  "drop_frac": 0.05,
+  "seconds": 569.3
+}
