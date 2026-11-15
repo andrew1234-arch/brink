@@ -113,3 +113,28 @@ def test_split_release_keeps_adapters_out_of_the_dataset(tmp_path):
     assert not any(f.startswith(("adapters/", "fingerprints/")) for f in data_files)
     assert not any(f.endswith("generations.jsonl") for f in model_files | data_files)
     assert "pretty_name" in (data / "README.md").read_text()
+
+
+def test_static_space_is_one_page_of_the_finished_reports(tmp_path):
+    from scripts.build_space import build
+
+    r = _fake_results(tmp_path)
+    (r / "repair" / "REPORT.md").write_text("# Repair: **DONE**\n\n| a | b |\n|---|---|\n| 1 | <script> |\n\n- one\n")
+    (r / "repair" / "repair.png").write_bytes(b"png")
+    out = build(tmp_path / "space", r, demo=False, sdk="static")
+    names = {p.name for p in out.rglob("*") if p.is_file()}
+    assert {"index.html", "README.md", "REPORT.md", "evals.csv", "repair.png"} <= names
+    assert not names & {"app.py", "requirements.txt", "generations.jsonl", "adapter_model.safetensors"}
+    assert "sdk: static" in (out / "README.md").read_text()
+    page = (out / "index.html").read_text()
+    assert "<strong>DONE</strong>" in page and "<td>1</td>" in page and "<li>one</li>" in page
+    assert 'src="results/repair/repair.png"' in page
+    assert "<script>" not in page and "SIMULATED" not in page  # report text is escaped
+
+
+def test_static_demo_space_says_it_is_simulated(tmp_path):
+    from scripts.build_space import build
+
+    out = build(tmp_path / "space", _fake_results(tmp_path), demo=True, sdk="static")
+    assert "SIMULATED" in (out / "index.html").read_text()
+    assert not (out / "results" / "repair").exists()

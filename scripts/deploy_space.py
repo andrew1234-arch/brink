@@ -6,6 +6,10 @@ Configuration comes from the environment, never from interpolation into shell:
     HF_SPACE_PUBLIC   "true" for a public Space; anything else keeps it private. Applied on every deploy.
     HF_SPACE_TOKEN    optional READ token, installed as the Space secret HF_TOKEN so live runs can load the gated
                       datasets (AdvBench, HarmBench). Use a read-only token: the Space runs code with it.
+    HF_SPACE_SDK      "gradio" (the app), "static" (one HTML page with the recorded results; free on Hugging
+                      Face, where a Gradio Space on free hardware needs a PRO account) or unset / "auto": the
+                      app if Hugging Face accepts it, else the static page; a Space deployed as static stays
+                      static until this is set to "gradio"
     DEPLOY_EVENT      the GitHub event: workflow_run (after CI passed), schedule or workflow_dispatch
     GITHUB_TOKEN, GITHUB_REPOSITORY   used to confirm CI passed for this commit on schedule / manual runs
 
@@ -37,7 +41,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from brink.io import finished_stages
-from scripts.build_space import build, push, set_visibility
+from scripts.build_space import SDKS, build, push, set_visibility
 
 RESULTS_BRANCH = "results/all"
 MARKER = "DEPLOYED.json"
@@ -134,8 +138,13 @@ def deploy(
     ci_check=ci_passed,
     marker_reader=deployed_marker,
     space_token: str | None = None,
+    sdk: str = "gradio",
 ) -> str:
     code = git(repo, "rev-parse", "HEAD").stdout.strip()
+    auto, last = sdk == "auto", None
+    if auto:  # keep what the Space already is; a new Space tries the app first
+        last = marker_reader(space_id, api) or {}
+        sdk = "static" if last.get("sdk") == "static" else "gradio"
     if event == "workflow_run":  # CI passed for `code`; deploy it only if nothing newer reached main since
         tip = remote_sha(repo, "main")
         if tip != code:
@@ -145,8 +154,8 @@ def deploy(
 
     rsha = remote_sha(repo, RESULTS_BRANCH)
     if event == "schedule":
-        last = marker_reader(space_id, api) or {}
-        if (last.get("code_sha"), last.get("results_sha")) == (code, rsha):
+        last = last if last is not None else marker_reader(space_id, api) or {}
+        if (last.get("code_sha"), last.get("results_sha"), last.get("sdk", "gradio")) == (code, rsha, sdk):
             set_visibility(api, space_id, public)  # the only setting that can change without a new commit
             return "skipped: nothing new since the last deploy"
 
@@ -154,14 +163,32 @@ def deploy(
         rsha, results = fetch_results(repo, Path(tmp)) if rsha else (None, None)
         stages = finished_stages(results)
         mode = "real" if stages else "demo"
-        folder = build(out, results, demo=(mode == "demo"))
-    marker = {"code_sha": code, "results_sha": rsha, "mode": mode, "stages": stages}
-    (folder / MARKER).write_text(json.dumps(marker, indent=2))
-    what = f"{len(stages)} finished experiment(s)" if stages else "SIMULATED demo runs"
-    push(folder, space_id, public, api=api, message=f"Deploy {code[:7]} with {what}")
-    if space_token:
+        what = f"{len(stages)} finished experiment(s)" if stages else "SIMULATED demo runs"
+
+        def publish(kind: str) -> None:
+            built = build(out, results, demo=(mode == "demo"), sdk=kind)
+            marker = {"code_sha": code, "results_sha": rsha, "mode": mode, "stages": stages, "sdk": kind}
+            (built / MARKER).write_text(json.dumps(marker, indent=2))
+            push(built, space_id, public, api=api, message=f"Deploy {code[:7]} with {what}", sdk=kind)
+
+        try:
+            publish(sdk)
+        except Exception as e:
+            if sdk != "gradio" or getattr(getattr(e, "response", None), "status_code", None) != 402:
+                raise
+            if auto:
+                print("::notice::Hugging Face needs a PRO account for a Gradio Space on free hardware (402): "
+                      "deploying the free static results page instead.")  # fmt: skip
+                sdk = "static"
+                publish(sdk)
+            else:
+                raise DeployError(
+                    "Hugging Face refused to create the Gradio Space (402 Payment Required): on free hardware it "
+                    "needs a PRO account. Set HF_SPACE_SDK to 'static' to deploy the free results page instead."
+                ) from e
+    if space_token and sdk == "gradio":  # a static page runs no code, so it needs no token
         api.add_space_secret(space_id, "HF_TOKEN", space_token, description="read token for gated datasets")
-    return f"deployed {mode} ({what}) at {code[:7]}"
+    return f"deployed {mode} ({what}{', static page' if sdk == 'static' else ''}) at {code[:7]}"
 
 
 def main() -> int:
@@ -171,6 +198,10 @@ def main() -> int:
         return 0
     public = os.environ.get("HF_SPACE_PUBLIC", "").strip().lower() == "true"
     event = os.environ.get("DEPLOY_EVENT", "workflow_dispatch")
+    sdk = os.environ.get("HF_SPACE_SDK", "").strip().lower() or "auto"
+    if sdk not in (*SDKS, "auto"):
+        print(f"::error::HF_SPACE_SDK must be auto or one of {', '.join(SDKS)} (got {sdk!r})")
+        return 1
     from huggingface_hub import HfApi
 
     try:
@@ -182,6 +213,7 @@ def main() -> int:
             ROOT / "build" / "space",
             api=HfApi(token=token),
             space_token=os.environ.get("HF_SPACE_TOKEN", "").strip() or None,
+            sdk=sdk,
         )
     except DeployError as e:
         print(f"::error::{e}")

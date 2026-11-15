@@ -10,6 +10,9 @@ mixed on one Space.
 
 The Gradio version comes from the pin in app/requirements.txt: the same file CI installs, so the deployed
 version is the tested one. Automatic deploys from GitHub Actions go through scripts/deploy_space.py.
+
+`--static` builds a static Space instead (free on Hugging Face, no server): one HTML page with every finished
+stage's report, plots and logs. It shows the recorded results only; the live tabs need the Gradio app.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ from brink.io import finished_stages
 REQUIREMENTS = ROOT / "app" / "requirements.txt"
 ALLOWED = {".csv", ".json", ".md", ".png"}
 SKIP_DIRS = {"adapter", "adapters", "_work", "__pycache__"}
+SDKS = ("gradio", "static")
 
 
 def gradio_pin(requirements: Path = REQUIREMENTS) -> str:
@@ -38,7 +42,30 @@ def gradio_pin(requirements: Path = REQUIREMENTS) -> str:
     return m.group(1)
 
 
-def space_readme() -> str:
+STATIC_README = """---
+title: Brink safety monitor
+emoji: 🛡️
+colorFrom: blue
+colorTo: red
+sdk: static
+pinned: false
+license: mit
+short_description: Catches LLM safety collapse during fine-tuning
+---
+
+# Brink · keep a model safe while you fine-tune it
+
+The recorded results of every finished Brink experiment on Tiny Aya: reports, plots and logs, including the
+criteria that failed. This page runs nothing. The live app (*Run Brink*, *Gate your data*) is in the repository:
+`make app`.
+
+Code: https://github.com/andrew1234-arch/brink
+"""
+
+
+def space_readme(sdk: str = "gradio") -> str:
+    if sdk == "static":
+        return STATIC_README
     return f"""---
 title: Brink safety monitor
 emoji: 🛡️
@@ -105,11 +132,33 @@ def copy_results(src: Path, dst: Path) -> tuple[int, list[str]]:
     return n, stages
 
 
-def build(out: Path, results: Path | None, demo: bool) -> Path:
+def build_static(out: Path, results: Path | None, demo: bool) -> Path:
+    """The static Space: index.html, the results it shows, and the README. No app code."""
+    from scripts.static_site import render
+
+    if demo:
+        from brink.dashboard.simulate import simulate_gate, simulate_go_nogo
+
+        simulate_go_nogo(out / "results" / "simulated_go_nogo")
+        simulate_gate(out / "results" / "simulated_gate")
+        stages = finished_stages(out / "results")
+    else:
+        _, stages = copy_results(results, out / "results") if results is not None and results.is_dir() else (0, [])
+    (out / "README.md").write_text(space_readme("static"))
+    (out / "index.html").write_text(render(out / "results", stages, simulated=demo), encoding="utf-8")
+    print(f"built {out} (static page, {len(stages)} {'SIMULATED' if demo else 'finished'} stage(s))")
+    return out
+
+
+def build(out: Path, results: Path | None, demo: bool, sdk: str = "gradio") -> Path:
     """Build the Space folder. With demo=True, `results` is ignored: the Space shows simulated runs only."""
+    if sdk not in SDKS:
+        raise ValueError(f"unknown Space SDK {sdk!r}: use one of {', '.join(SDKS)}")
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
+    if sdk == "static":
+        return build_static(out, results, demo)
     shutil.copy2(ROOT / "app" / "app.py", out / "dashboard.py")  # not app.py: the Space entry point is app.py
     shutil.copy2(ROOT / "app" / "live_tab.py", out / "live_tab.py")
     shutil.copytree(ROOT / "app" / "examples", out / "examples")
@@ -136,13 +185,15 @@ def set_visibility(api, space_id: str, public: bool) -> None:
     api.update_repo_settings(space_id, private=not public, repo_type="space")
 
 
-def push(out: Path, space_id: str, public: bool, api=None, message: str = "Deploy Brink dashboard") -> None:
+def push(
+    out: Path, space_id: str, public: bool, api=None, message: str = "Deploy Brink dashboard", sdk: str = "gradio"
+) -> None:
     """Upload `out` so the Space mirrors it exactly, and apply the visibility setting."""
     if api is None:
         from huggingface_hub import HfApi
 
         api = HfApi()
-    api.create_repo(space_id, repo_type="space", space_sdk="gradio", private=not public, exist_ok=True)
+    api.create_repo(space_id, repo_type="space", space_sdk=sdk, private=not public, exist_ok=True)
     set_visibility(api, space_id, public)
     # "*" removes remote files that aren't in this upload (renamed modules, old results); uploaded files are kept.
     api.upload_folder(
@@ -158,10 +209,12 @@ def main():
     ap.add_argument("--demo", action="store_true", help="build with clearly-bannered simulated runs instead")
     ap.add_argument("--push", metavar="REPO_ID", help="upload to this Space (needs HF_TOKEN with write access)")
     ap.add_argument("--public", action="store_true", help="make the Space public (default: private)")
+    ap.add_argument("--static", action="store_true", help="a static results page instead of the Gradio app")
     args = ap.parse_args()
-    out = build(Path(args.out), Path(args.results), args.demo)
+    sdk = "static" if args.static else "gradio"
+    out = build(Path(args.out), Path(args.results), args.demo, sdk=sdk)
     if args.push:
-        push(out, args.push, args.public)
+        push(out, args.push, args.public, sdk=sdk)
 
 
 if __name__ == "__main__":

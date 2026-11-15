@@ -289,3 +289,70 @@ def test_space_token_becomes_the_space_secret(repo, tmp_path):
     without = FakeApi()
     _run(clone, tmp_path, without)
     assert "secret" not in without.kinds()
+
+
+def test_static_deploy_is_a_results_page_without_app_or_secret(repo, tmp_path):
+    clone, _, publish = repo
+    publish({"results/repair/REPORT.md": "# done", "results/repair/summary.json": "{}"})
+    api = FakeApi()
+    status = deploy(clone, "me/brink", True, "workflow_run", tmp_path / "space", api=api, ci_check=lambda s: True,
+                    marker_reader=lambda s, a: None, space_token="hf_read", sdk="static")  # fmt: skip
+    assert status.startswith("deployed real (1 finished experiment(s), static page)")
+    assert api.calls[0][2]["space_sdk"] == "static"
+    assert "secret" not in api.kinds()  # a static page runs no code: no token on the Space
+    out = tmp_path / "space"
+    assert (out / "index.html").exists() and not (out / "app.py").exists()
+    assert json.loads((out / "DEPLOYED.json").read_text())["sdk"] == "static"
+
+
+def test_changing_the_sdk_redeploys_on_schedule(repo, tmp_path):
+    clone, _, _ = repo
+    _run(clone, tmp_path, FakeApi())
+    marker = json.loads((tmp_path / "space" / "DEPLOYED.json").read_text())
+    status = deploy(clone, "me/brink", False, "schedule", tmp_path / "space", api=FakeApi(),
+                    ci_check=lambda s: True, marker_reader=lambda s, a: marker, sdk="static")  # fmt: skip
+    assert status.startswith("deployed")
+
+
+def test_gradio_paywall_names_the_static_fallback(repo, tmp_path):
+    class Paywalled(FakeApi):
+        def create_repo(self, repo_id, **kw):
+            err = RuntimeError("402 Payment Required")
+            err.response = type("R", (), {"status_code": 402})()
+            raise err
+
+    clone, _, _ = repo
+    with pytest.raises(DeployError, match="HF_SPACE_SDK"):
+        _run(clone, tmp_path, Paywalled())
+
+
+def test_unknown_sdk_is_refused(monkeypatch, capsys):
+    monkeypatch.setenv("HF_SPACE_ID", "me/brink")
+    monkeypatch.setenv("HF_TOKEN", "hf_x")
+    monkeypatch.setenv("HF_SPACE_SDK", "docker")
+    assert deploy_space.main() == 1
+    assert "::error::" in capsys.readouterr().out
+
+
+def test_auto_falls_back_to_static_on_the_paywall_and_stays_static(repo, tmp_path):
+    class Paywalled(FakeApi):
+        def create_repo(self, repo_id, **kw):
+            if kw.get("space_sdk") == "gradio":
+                err = RuntimeError("402 Payment Required")
+                err.response = type("R", (), {"status_code": 402})()
+                raise err
+            super().create_repo(repo_id, **kw)
+
+    clone, _, _ = repo
+    api = Paywalled()
+    status = deploy(clone, "me/brink", True, "workflow_run", tmp_path / "space", api=api, ci_check=lambda s: True,
+                    marker_reader=lambda s, a: None, space_token="hf_read", sdk="auto")  # fmt: skip
+    assert "static page" in status and "secret" not in api.kinds()
+    marker = json.loads((tmp_path / "space" / "DEPLOYED.json").read_text())
+    assert marker["sdk"] == "static" and (tmp_path / "space" / "index.html").exists()
+    again = FakeApi()  # the Space is static now: never push the app over it, even if creating one would succeed
+    deploy(clone, "me/brink", True, "workflow_dispatch", tmp_path / "space", api=again, ci_check=lambda s: True,
+           marker_reader=lambda s, a: marker, sdk="auto")  # fmt: skip
+    assert again.calls[0][2]["space_sdk"] == "static"
+    assert deploy(clone, "me/brink", True, "schedule", tmp_path / "space", api=FakeApi(), ci_check=lambda s: True,
+                  marker_reader=lambda s, a: marker, sdk="auto").startswith("skipped: nothing new")  # fmt: skip
