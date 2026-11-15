@@ -229,5 +229,5 @@ brink/
 
 ## 9. Status
 
-Everything above is built and tested offline (`make test`; CI runs it on every push). What remains is running
-the experiments on GPUs and filling the results into [SUBMISSION.md](SUBMISSION.md).
+Everything above is built and tested offline (`make test`; CI runs it on every push). The experiment
+results are in [ARTICLE.md](ARTICLE.md) and under `results/`.

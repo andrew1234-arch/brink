@@ -29,3 +29,10 @@ hf_cache/
 
 # Local build output
 build/
+
+# Local working notes and assistant settings: not part of the published project
+.claude/
+docs/HANDOFF.md
+docs/SCORECARD.md
+docs/SUBMISSION.md
+docs/ABSTRACT.md

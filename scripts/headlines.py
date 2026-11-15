@@ -1,7 +1,7 @@
 """Every headline number the write-up needs, each traced to the file and key it came from.
 
     python scripts/headlines.py                         # writes results/HEADLINES.md and results/headlines.json
-    python scripts/headlines.py --fill docs/ABSTRACT.md docs/ARTICLE.md   # also fills ⟦name⟧ markers in place
+    python scripts/headlines.py --fill docs/ARTICLE.md   # also fills ⟦name⟧ markers in place
 
 Write-ups use named markers such as ⟦go_nogo.lead_mean⟧. --fill replaces each marker whose number exists and
 leaves the rest (missing stages, or quantities the stage didn't produce) untouched and listed. Nothing is

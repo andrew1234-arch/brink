@@ -130,7 +130,7 @@ trainer.train()
 
 Each experiment writes a `REPORT.md` with an explicit verdict, and the dashboard reads every run.
 
-**Results so far** (Tiny Aya on a Kaggle T4; details and the rest in [docs/SUBMISSION.md](docs/SUBMISSION.md)):
+**Results so far** (Tiny Aya on a Kaggle T4; the full write-up is [docs/ARTICLE.md](docs/ARTICLE.md)):
 
 - **End to end (recorded live run, 1 seed):** fine-tuning on 128 samples, 32 of them harmful, took the model
   from answering 21 % of held-out harmful prompts to **94 %** (it refused only 4 %). The same fine-tune with Brink
@@ -163,10 +163,8 @@ Each experiment writes a `REPORT.md` with an explicit verdict, and the dashboard
 
 ## The Lexsi stack in Brink
 
-| Toolkit | Role |
-|---|---|
 Hackathon entry: **Track 2b (AI Safety and Correction)**, problem statement **#5 Safety-preserving fine-tuning**,
-also #9 (locating where safety lives) and 2a #4 (multilingual safety). See [docs/ABSTRACT.md](docs/ABSTRACT.md).
+also #9 (locating where safety lives) and 2a #4 (multilingual safety). Write-up: [docs/ARTICLE.md](docs/ARTICLE.md).
 
 | Toolkit | Role |
 |---|---|
@@ -192,9 +190,8 @@ Published: fingerprints, results, and Brink-protected adapters.
 - [Architecture](docs/ARCHITECTURE.md): components, design decisions, repository layout.
 - [Related work](docs/RELATED_WORK.md): prior work, and what Brink does and doesn't claim.
 - [The app](docs/DASHBOARD.md): Run Brink live, Gate your data, the experiment dashboard, the Space.
-- [Submission](docs/SUBMISSION.md): write-up, Demo Day and video scripts.
+- [Write-up](docs/ARTICLE.md): approach, datasets, metrics, results and limitations.
 - [Upstream feedback](docs/UPSTREAM.md): for the Lexsi toolkits.
-- [Handoff](docs/HANDOFF.md): current status and the remaining steps.
 
 ## Development
 
