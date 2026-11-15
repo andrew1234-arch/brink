@@ -34,6 +34,9 @@ auditkit = ["auditkit"]
 dashboard = ["gradio==6.31.0", "plotly>=5"]
 dev = ["pytest", "ruff"]
 
+[project.scripts]
+brink = "brink.cli:main"
+
 [project.urls]
 Repository = "https://github.com/andrew1234-arch/brink"
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -128,8 +129,16 @@ def test_static_space_is_one_page_of_the_finished_reports(tmp_path):
     assert "sdk: static" in (out / "README.md").read_text()
     page = (out / "index.html").read_text()
     assert "<strong>DONE</strong>" in page and "<td>1</td>" in page and "<li>one</li>" in page
+    assert "brink gate" in page and 'id="use"' in page and 'class="chip ok">DONE' in page
     assert 'src="results/repair/repair.png"' in page
-    assert "<script>" not in page and "SIMULATED" not in page
+    assert "&lt;script&gt;" in page and "| <script> |" not in page and "SIMULATED" not in page
+    site = {"favicon.ico", "favicon.svg", "apple-touch-icon.png", "og-image.png", "site.webmanifest", "robots.txt"}
+    assert site | {"sitemap.xml"} <= names
+    for name in site - {"site.webmanifest", "robots.txt"}:
+        assert f'"{name}"' in page or f"/{name}" in page
+    assert json.loads((out / "site.webmanifest").read_text())["icons"]
+    assert "Sitemap:" in (out / "robots.txt").read_text()
+    assert '"@context": "https://schema.org"' in page or '"@context":"https://schema.org"' in page
 
 
 def test_static_demo_space_says_it_is_simulated(tmp_path):
@@ -138,3 +147,29 @@ def test_static_demo_space_says_it_is_simulated(tmp_path):
     out = build(tmp_path / "space", _fake_results(tmp_path), demo=True, sdk="static")
     assert "SIMULATED" in (out / "index.html").read_text()
     assert not (out / "results" / "repair").exists()
+
+
+def test_product_page_demo_replays_the_recorded_run(tmp_path):
+    from scripts.static_site import demo_data, render
+
+    live = tmp_path / "results" / "live"
+    for cond, z in (("unprotected", [0.0, -4.0, -9.0]), ("brink", [0.0, 1.0, -1.0])):
+        (live / cond).mkdir(parents=True)
+        (live / cond / "probe.csv").write_text("step,z_S3\n" + "".join(f"{4 * i},{v}\n" for i, v in enumerate(z)))
+    (live / "gate.csv").write_text("rank,sample,score,harmful,dropped\n1,3,0.4,1,1\n2,0,-0.1,0,0\n")
+    summary = {
+        "model": "m",
+        "config": {"alarm_threshold": -3.0, "alarm_persistence": 2, "gate_drop_frac": 0.5},
+        "before": {"asr": 0.2},
+        "unprotected": {"asr": 0.9, "over_refusal": 0.0, "heldout_loss": 1.5},
+        "brink": {"asr": 0.2, "over_refusal": 0.0, "heldout_loss": 1.6},
+        "gate": {"harmful_caught": 1, "harmful_total": 1},
+    }
+    (live / "summary.json").write_text(json.dumps(summary))
+    (live / "REPORT.md").write_text("# Brink, end to end")
+    d = demo_data(tmp_path / "results")
+    assert d["unprotected"] == {"steps": [0, 4, 8], "z": [0.0, -4.0, -9.0]} and d["gate"] == [[0.4, 1], [-0.1, 0]]
+    assert d["asr_unprotected"] == "90 %" and d["threshold"] == -3.0
+    page = render(tmp_path / "results", ["live"])
+    assert "window.BRINK_DEMO" in page and 'id="alarm-chart"' in page and "90 % → 20 %" in page
+    assert demo_data(tmp_path / "nothing") is None and "BRINK_DEMO =" not in render(tmp_path / "nothing", [])

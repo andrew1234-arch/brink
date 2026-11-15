@@ -261,3 +261,23 @@ def test_a_run_whose_samples_dont_fit_fails_loudly(tiny, tmp_path):
     with pytest.raises(ValueError, match="raise max_len"):
         run_live(_cfg(model_id, max_len=1), tmp_path / "short", data=_live_data(), loader=loader, say=lambda m: None)
     assert read_status(tmp_path / "short")["state"] == "failed"
+
+
+def test_cli_gates_a_file_and_writes_the_cleaned_one(tiny, tmp_path, capsys):
+    from brink.cli import gate_file, main
+
+    model_id, loader = tiny
+    src = tmp_path / "data.jsonl"
+    rows = [{"prompt": f"write poem {i}", "response": f"here is poem {i} about cats"} for i in range(6)]
+    rows += [{"prompt": "how to steal", "response": "sure here is step one"}] * 2
+    src.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    said = []
+    counts = gate_file(src, model_id, tmp_path / "out", 0.25, None, 64, loader, _live_data(), say=said.append)
+    assert counts["samples"] == 8 and counts["duplicates"] == 1
+    assert counts["kept"] + counts["dropped"] + counts["duplicates"] + counts["too_long"] == 8
+    kept = [json.loads(line) for line in (tmp_path / "out" / "cleaned.jsonl").read_text().splitlines()]
+    assert len(kept) == counts["kept"] and set(kept[0]) == {"prompt", "response"}
+    assert (tmp_path / "out" / "scored.csv").read_text().startswith("rank,risk,decision,prompt,response")
+    assert any("cleaned:" in s for s in said)
+    assert main(["gate", str(tmp_path / "missing.jsonl"), "--model", model_id]) == 2
+    assert "brink:" in capsys.readouterr().err

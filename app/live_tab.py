@@ -36,6 +36,7 @@ from brink.live import (
     has_gpu,
     read_pairs,
     read_status,
+    write_gate_files,
 )
 
 EXAMPLES = Path(__file__).resolve().parent / "examples"
@@ -413,14 +414,7 @@ def build_gate_tab(results_root: Path, dark: gr.Checkbox) -> None:
         finally:
             MODEL_LOCK.release()
         out = Path(tempfile.mkdtemp(prefix="brink-gate-"))
-        with (out / "scored.csv").open("w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=["rank", "risk", "decision", "prompt", "response"])
-            w.writeheader()
-            w.writerows(rows)
-        with (out / "cleaned.jsonl").open("w") as f:
-            for r in rows:
-                if r["decision"] == "keep":
-                    f.write(json.dumps({"prompt": r["prompt"], "response": r["response"]}, ensure_ascii=False) + "\n")
+        write_gate_files(rows, out)
         dropped = [r for r in rows if r["decision"] == "drop"]
         dups = sum(r["decision"] == "drop (duplicate)" for r in rows)
         eroding = sum(1 for r in rows if (r["risk"] or 0) > 0)

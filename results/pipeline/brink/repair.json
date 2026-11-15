@@ -5,12 +5,12 @@
   "rolled_back_to": 8,
   "guard": {
     "steps": 112,
-    "projected": 69,
-    "refresh_seconds": 344.2879147529602,
-    "mean_removed_frac": 0.056343579333836956
+    "projected": 70,
+    "refresh_seconds": 353.20526337623596,
+    "mean_removed_frac": 0.05660386172718928
   },
   "trainer": "aligntune (trl backend)",
-  "train_seconds": 2218.2,
+  "train_seconds": 2268.1,
   "dataset": "sft_alpaca.jsonl",
   "alarm_threshold": -3.0
 }

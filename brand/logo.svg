@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 252 64" role="img" aria-label="Brink">
+  <defs><clipPath id="t"><rect width="64" height="64" rx="15"/></clipPath></defs>
+  <g clip-path="url(#t)">
+    <rect width="64" height="64" fill="#7459CC"/>
+    <rect x="41" y="51" width="23" height="13" fill="#4A3699"/>
+    <path d="M0 37h41v27H0z" fill="#2B2063"/>
+    <circle cx="34" cy="30" r="7" fill="#FFFFFF"/>
+  </g>
+  <text x="80" y="46" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="40" font-weight="700" letter-spacing="-1" fill="#1A1726">Brink</text>
+</svg>

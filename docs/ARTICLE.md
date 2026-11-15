@@ -32,7 +32,7 @@ log lists the public HarmBench evaluation prompts with a refused / complied labe
 >   full under "What didn't work", not relaxed after the fact.
 > - Everything is reproducible from the repository on a free Kaggle T4 x2.
 >
-> [Results page](https://huggingface.co/spaces/cmgdevl/brink) · [Code](https://github.com/andrew1234-arch/brink)
+> [Product page](https://huggingface.co/spaces/cmgdevl/brink) · [Code](https://github.com/andrew1234-arch/brink)
 
 ## Abstract
 
@@ -115,12 +115,13 @@ measured against the standard fixes on the same data. Details: `docs/RELATED_WOR
   *Gate your data* tab.
 - **SafeTune.** ReSta and refusal-direction steering, applied to the drifted adapter, are the post-hoc
   baselines in the repair experiment.
-- **AuditKIT.** Red-team probes (jailbreak, encoding, prompt injection, refusal) run in the verify step of the
-  pipeline and repair experiments. Their scores from these runs are not quoted: see Limitations.
+- **AuditKIT.** Red-team probes (jailbreak, encoding, prompt injection, refusal) run in the verify step, each
+  family scored with the detector that fits it and jailbreaks judged by WildGuard. In the Hindi use case the
+  unprotected model resists 29 % of attacks and the Brink model 57 %, the base model's level.
 - **AlignTune** (Track 1). The trainer for both conditions of the Hindi use case (TRL backend), with Brink
   attached as a callback.
 - **CircuitKIT.** A `circuit` stage compares CircuitKIT's EAP-IG refusal circuit with the layer Brink monitors.
-  It is implemented and tested offline but has not run on a GPU, so it has no result here.
+  It is tested offline; its one Kaggle run failed before writing an error report, so it has no result here.
 
 **How they connect.** CuratorKIT curates the data (dedup, then Brink's gate) → AlignTune fine-tunes with
 Brink's monitor, alarm and repair attached → WildGuard and AuditKIT evaluate the result → SafeTune's repairs
@@ -164,6 +165,8 @@ experiments). They are ordinary requests, not prompts chosen to look risky.
 | Refusal signal S3 (z-score of J) | higher | The cheap signal the monitor watches; judge-free |
 | Over-refusal on harmless prompts | lower | Safety must not come from refusing everything |
 | Held-out task loss | lower | The fine-tune must still learn the task |
+| chrF of replies against references on held-out Hindi | higher | Task quality as text, not only as loss |
+| AuditKIT attacks resisted (jailbreak, encoding, prompt injection) | higher | A second, attack-style view of safety |
 | Gate AUROC and recall at the top 5 % | higher | Does the gate rank the harmful samples first |
 | Alarm lead, detection and false-alarm rate | — | Is the alarm usable: early, complete, quiet on safe runs |
 
@@ -204,6 +207,9 @@ Tiny Aya Global, 512 Hindi instruction pairs with 51 harmful samples. Pipeline: 
 | Attack success, Hindi (Aya red-teaming) ↓ | 2 % | 0 % | 0 % |
 | Over-refusal, Hindi ↓ | 0 % | 3 % | 0 % |
 | Hindi task loss ↓ | 2.102 | 1.788 | 1.800 |
+| Task quality, chrF on held-out Hindi ↑ | 32.3 | 31.7 | 31.4 |
+| AuditKIT attacks resisted ↑ | 57 % | 29 % | 57 % |
+| AuditKIT jailbreaks resisted ↑ | 75 % | 13 % | 50 % |
 
 The alarm fired at step 16 in both runs. The Brink run rolled back to step 8 and finished under the guard. All
 four pre-set checks pass. Hindi attack success stayed at 0–2 % in every model, so this run shows no Hindi
@@ -273,10 +279,11 @@ run (go / no-go 3.2 h, gate 2.4 h, repair 3.5 h, multilingual 2.3 h, pipeline 1.
 - One model family (Tiny Aya, 3.35B); two seeds in go / no-go and one elsewhere; small evaluation sets (48–64
   prompts), hence the wide confidence intervals.
 - The three negative results above.
-- AuditKIT scores are not quoted. These runs scored the probes with AuditKIT's default detectors, which count
-  a refusal as a failed attack. The scoring is fixed in the code (`brink/eval/audit.py`); the runs predate it.
-- The chrF task-quality metric and the CircuitKIT stage are implemented and tested offline, but not in these
-  runs. Task quality is reported as held-out loss only.
+- AuditKIT scores are quoted for the Hindi use case only. The repair experiment ran before a scoring fix
+  (AuditKIT's default detectors count a refusal as a failed attack), so its AuditKIT column is not used.
+- Both fine-tunes lose a little task quality by chrF (32.3 → 31.7 unprotected, 31.4 with Brink) while task loss
+  improves. We did not investigate why.
+- The CircuitKIT stage has no result: its one GPU run failed without a report.
 - WildGuard is mostly English-trained, and its agreement with human labels was not checked.
 - ProCon-style anchoring, the closest published method to the guard, isn't among the baselines.
 - No results on a quantized model.
@@ -284,8 +291,8 @@ run (go / no-go 3.2 h, gate 2.4 h, repair 3.5 h, multilingual 2.3 h, pipeline 1.
 ## With more credits
 
 - **Planned:** more seeds and larger evaluation sets to tighten the intervals; a per-language calibrated
-  threshold; a stronger guard (several probe directions, a larger projection); the CircuitKIT comparison and
-  chrF on GPU; AuditKIT with the corrected scoring; ProCon as a baseline; a second model (Aya Expanse 8B).
+  threshold; a stronger guard (several probe directions, a larger projection); the CircuitKIT comparison on GPU;
+  longer task training so chrF improves; ProCon as a baseline; a second model (Aya Expanse 8B).
 - **Expected:** the Hindi and Tagalog false alarms should go away with per-language calibration, as the English
   ones did. Whether a stronger guard closes the gap to safety mixing (41 % against 23 %) is open; the honest
   forecast is that gate + halt stays the reliable configuration.
@@ -293,9 +300,9 @@ run (go / no-go 3.2 h, gate 2.4 h, repair 3.5 h, multilingual 2.3 h, pipeline 1.
 ## Artifacts
 
 - **Code:** https://github.com/andrew1234-arch/brink
-- **Results page (Space):** https://huggingface.co/spaces/cmgdevl/brink
-- **Logs, reports and fingerprints:** `results/` in the repository, and the Hugging Face dataset collection
-  linked from the submission form.
+- **Product page (Space):** https://huggingface.co/spaces/cmgdevl/brink
+- **Protected adapter and fingerprints:** https://huggingface.co/cmgdevl/brink-artifacts
+- **Logs and reports:** https://huggingface.co/datasets/cmgdevl/brink-results
 
 ## Documentation and reproduction
 

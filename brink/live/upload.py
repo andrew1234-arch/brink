@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -131,3 +132,19 @@ def gate_pairs(
         }
         for r, i in enumerate(order, 1)
     ]
+
+
+def write_gate_files(rows: list[dict], out: Path) -> tuple[Path, Path]:
+    """Write the gate's output: scored.csv (every sample, riskiest first) and cleaned.jsonl (the kept ones)."""
+    out = Path(out)
+    out.mkdir(parents=True, exist_ok=True)
+    scored, cleaned = out / "scored.csv", out / "cleaned.jsonl"
+    with scored.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["rank", "risk", "decision", "prompt", "response"])
+        w.writeheader()
+        w.writerows(rows)
+    with cleaned.open("w", encoding="utf-8") as f:
+        for r in rows:
+            if r["decision"] == "keep":
+                f.write(json.dumps({"prompt": r["prompt"], "response": r["response"]}, ensure_ascii=False) + "\n")
+    return scored, cleaned

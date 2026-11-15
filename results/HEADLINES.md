@@ -42,13 +42,13 @@ shown.
 | `pipeline.asr_hi_brink` | 0 % | results/pipeline/summary.json → conditions.brink.final.asr_hi |
 | `pipeline.over_refusal_naive` | 3 % | results/pipeline/summary.json → conditions.naive.final.over_refusal |
 | `pipeline.over_refusal_brink` | 0 % | results/pipeline/summary.json → conditions.brink.final.over_refusal |
-| `pipeline.chrf_before` | — | not yet |
-| `pipeline.chrf_naive` | — | not yet |
-| `pipeline.chrf_brink` | — | not yet |
+| `pipeline.chrf_before` | 32.3 | results/pipeline/summary.json → conditions.naive.ref.task_chrf |
+| `pipeline.chrf_naive` | 31.7 | results/pipeline/summary.json → conditions.naive.final.task_chrf |
+| `pipeline.chrf_brink` | 31.4 | results/pipeline/summary.json → conditions.brink.final.task_chrf |
 | `pipeline.loss_naive` | 1.788 | results/pipeline/summary.json → conditions.naive.final.heldout_loss |
 | `pipeline.loss_brink` | 1.800 | results/pipeline/summary.json → conditions.brink.final.heldout_loss |
-| `pipeline.redteam_naive` | 48 % | results/pipeline/summary.json → conditions.naive.final.redteam_attack_resistance |
-| `pipeline.redteam_brink` | 76 % | results/pipeline/summary.json → conditions.brink.final.redteam_attack_resistance |
+| `pipeline.redteam_naive` | 29 % | results/pipeline/summary.json → conditions.naive.final.redteam_attack_resistance |
+| `pipeline.redteam_brink` | 57 % | results/pipeline/summary.json → conditions.brink.final.redteam_attack_resistance |
 | `pipeline.planted_caught` | 21 | results/pipeline/summary.json → conditions.brink.gate.planted_caught |
 | `pipeline.planted_total` | 51 | results/pipeline/summary.json → conditions.brink.gate.planted_total |
 | `live.verdict` | Unprotected fine-tuning cut refusal from 77% to 4%; with Brink it ended at 69%, preventing 89% of the loss. Brink's alarm fired at step 20 of the unprotected run. | results/live/summary.json → verdict |

@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo-dark.svg">
+    <img src="brand/logo.svg" alt="Brink" width="260">
+  </picture>
+</p>
+
 # Brink
 
 [![CI](https://github.com/andrew1234-arch/brink/actions/workflows/ci.yml/badge.svg)](https://github.com/andrew1234-arch/brink/actions/workflows/ci.yml)
@@ -84,6 +91,15 @@ See [docs/DASHBOARD.md](docs/DASHBOARD.md). `make live` records the same run hea
 
 ### Use it in your own fine-tuning
 
+**From the command line:**
+
+```bash
+brink gate my_finetune.jsonl --model CohereLabs/tiny-aya-global --drop 0.05 --out gated/   # scored.csv + cleaned.jsonl
+brink run --model Qwen/Qwen2.5-0.5B-Instruct --out runs/demo                               # the whole loop, with a report
+```
+
+**In your training code:**
+
 ```python
 from brink.monitor.callback import BrinkCallback
 from brink.monitor.core import Monitor
@@ -110,6 +126,9 @@ trainer.train()
 
 - **AlignTune:** `attach_to_aligntune(aligntune_trainer, BrinkCallback(controller=...))`.
 - **CuratorKIT:** add `BrinkSafetyGate(GateScorer(...), drop_frac=0.05)` as a step in a `curatorkit.Pipeline`.
+- **A model Brink already protected:** the Hindi assistant's LoRA adapter is on the Hub,
+  [`cmgdevl/brink-artifacts`](https://huggingface.co/cmgdevl/brink-artifacts)
+  (`subfolder="adapters/_work/pipeline/adapters/brink"`), on top of `CohereLabs/tiny-aya-global`.
 
 ## Experiments
 
@@ -152,8 +171,10 @@ Each experiment writes a `REPORT.md` with an explicit verdict, and the dashboard
 - **The Hindi assistant (04, the full Lexsi pipeline):** fine-tuning on 512 Hindi instruction pairs, 51 of them
   harmful, raised English attack success from 16 % to **42 %**. With Brink (CuratorKIT gate, then AlignTune
   training with alarm, rollback and guard) it ended at **6 %**, with no over-refusal and the same task loss
-  (1.800 vs 1.788; 2.102 before). All four pre-set checks pass. Hindi attack success stayed at 0–2 % in every
-  model, so this run shows no Hindi erosion to prevent.
+  (1.800 vs 1.788; 2.102 before). Task quality is close too (chrF 31.4 vs 31.7; 32.3 before). AuditKIT's
+  red-team probes agree: the unprotected model resists 29 % of attacks, the Brink model 57 %, the same as before
+  fine-tuning. All four pre-set checks pass. Hindi attack success stayed at 0–2 % in every model, so this run
+  shows no Hindi erosion to prevent.
 - **Gate (01):** it ranks planted harmful samples at the top (AUROC 0.981; 86 % of them in the top 5 %). On
   benign data the predicted ordering holds (fine-tuning on the top-scored subset ends at 19 % attack success,
   random 11 %, bottom 9 %), but the gap is 8 points and the pre-set check asked for 10: **not proven**.

@@ -32,6 +32,28 @@ REQUIREMENTS = ROOT / "app" / "requirements.txt"
 ALLOWED = {".csv", ".json", ".md", ".png"}
 SKIP_DIRS = {"adapter", "adapters", "_work", "__pycache__"}
 SDKS = ("gradio", "static")
+BRAND = ROOT / "brand"
+SITE_FILES = (
+    "favicon.ico",
+    "favicon.svg",
+    "favicon-16.png",
+    "favicon-32.png",
+    "favicon-48.png",
+    "apple-touch-icon.png",
+    "icon-192.png",
+    "icon-512.png",
+    "icon-512.webp",
+    "icon-maskable-512.png",
+    "logo.svg",
+    "logo-dark.svg",
+    "logo.png",
+    "logo-dark.png",
+    "logo.webp",
+    "mark.svg",
+    "og-image.png",
+    "og-image.webp",
+    "og-image.jpg",
+)
 
 
 def gradio_pin(requirements: Path = REQUIREMENTS) -> str:
@@ -45,8 +67,8 @@ def gradio_pin(requirements: Path = REQUIREMENTS) -> str:
 STATIC_README = """---
 title: Brink safety monitor
 emoji: 🛡️
-colorFrom: blue
-colorTo: red
+colorFrom: purple
+colorTo: indigo
 sdk: static
 pinned: false
 license: mit
@@ -69,8 +91,8 @@ def space_readme(sdk: str = "gradio") -> str:
     return f"""---
 title: Brink safety monitor
 emoji: 🛡️
-colorFrom: blue
-colorTo: red
+colorFrom: purple
+colorTo: indigo
 sdk: gradio
 sdk_version: {gradio_pin()}
 python_version: "3.12"
@@ -102,10 +124,16 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from dashboard import CSS, MAX_UPLOAD, build  # noqa: E402
+from dashboard import CSS, FAVICON, MAX_UPLOAD, THEME, build  # noqa: E402
 
 demo = build(HERE / "results")
-demo.launch(css=CSS, js="() => { document.body.classList.remove('dark'); }", max_file_size=MAX_UPLOAD)
+demo.launch(
+    css=CSS,
+    theme=THEME,
+    favicon_path=FAVICON,
+    js="() => { document.body.classList.remove('dark'); }",
+    max_file_size=MAX_UPLOAD,
+)
 """
 
 
@@ -144,6 +172,13 @@ def build_static(out: Path, results: Path | None, demo: bool) -> Path:
         stages = finished_stages(out / "results")
     else:
         _, stages = copy_results(results, out / "results") if results is not None and results.is_dir() else (0, [])
+    from scripts.static_site import manifest, robots, sitemap
+
+    for name in SITE_FILES:
+        shutil.copy2(BRAND / name, out / name)
+    (out / "site.webmanifest").write_text(manifest(), encoding="utf-8")
+    (out / "robots.txt").write_text(robots(), encoding="utf-8")
+    (out / "sitemap.xml").write_text(sitemap(), encoding="utf-8")
     (out / "README.md").write_text(space_readme("static"))
     (out / "index.html").write_text(render(out / "results", stages, simulated=demo), encoding="utf-8")
     print(f"built {out} (static page, {len(stages)} {'SIMULATED' if demo else 'finished'} stage(s))")
@@ -162,6 +197,7 @@ def build(out: Path, results: Path | None, demo: bool, sdk: str = "gradio") -> P
     shutil.copy2(ROOT / "app" / "app.py", out / "dashboard.py")
     shutil.copy2(ROOT / "app" / "live_tab.py", out / "live_tab.py")
     shutil.copytree(ROOT / "app" / "examples", out / "examples")
+    shutil.copytree(BRAND, out / "brand")
     shutil.copytree(ROOT / "brink", out / "brink", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copy2(REQUIREMENTS, out / "requirements.txt")
     (out / "README.md").write_text(space_readme())

@@ -184,24 +184,39 @@
   "text": "0 %",
   "source": "results/pipeline/summary.json → conditions.brink.final.over_refusal"
  },
+ "pipeline.chrf_before": {
+  "value": 32.25322727401876,
+  "text": "32.3",
+  "source": "results/pipeline/summary.json → conditions.naive.ref.task_chrf"
+ },
+ "pipeline.chrf_naive": {
+  "value": 31.71033562054781,
+  "text": "31.7",
+  "source": "results/pipeline/summary.json → conditions.naive.final.task_chrf"
+ },
+ "pipeline.chrf_brink": {
+  "value": 31.421786935954557,
+  "text": "31.4",
+  "source": "results/pipeline/summary.json → conditions.brink.final.task_chrf"
+ },
  "pipeline.loss_naive": {
   "value": 1.7883723563290104,
   "text": "1.788",
   "source": "results/pipeline/summary.json → conditions.naive.final.heldout_loss"
  },
  "pipeline.loss_brink": {
-  "value": 1.8004187848063706,
+  "value": 1.8004019979123476,
   "text": "1.800",
   "source": "results/pipeline/summary.json → conditions.brink.final.heldout_loss"
  },
  "pipeline.redteam_naive": {
-  "value": 0.47619047619047616,
-  "text": "48 %",
+  "value": 0.2857142857142857,
+  "text": "29 %",
   "source": "results/pipeline/summary.json → conditions.naive.final.redteam_attack_resistance"
  },
  "pipeline.redteam_brink": {
-  "value": 0.7619047619047619,
-  "text": "76 %",
+  "value": 0.5714285714285714,
+  "text": "57 %",
   "source": "results/pipeline/summary.json → conditions.brink.final.redteam_attack_resistance"
  },
  "pipeline.planted_caught": {

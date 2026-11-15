@@ -40,6 +40,26 @@ from brink.dashboard import figures as F
 from brink.dashboard.metrics import AlarmRule, alarm_step, behaviour_break, kpis, rule_from_run, status
 from brink.dashboard.runs import Run, discover_runs, load_run, stage_reports
 
+LAVENDER = gr.themes.Color(
+    c50="#F6F4FE",
+    c100="#EEEAFD",
+    c200="#DCD4FA",
+    c300="#C2B5F4",
+    c400="#A592EA",
+    c500="#8A73DE",
+    c600="#7459CC",
+    c700="#5B43B3",
+    c800="#4A3699",
+    c900="#3A2B78",
+    c950="#2B2063",
+    name="lavender",
+)
+THEME = gr.themes.Default(primary_hue=LAVENDER)
+_HERE = Path(__file__).resolve().parent
+FAVICON = next(
+    (p for p in (_HERE / "brand" / "favicon-48.png", _HERE.parent / "brand" / "favicon-48.png") if p.exists()), None
+)
+
 CSS = """
 .brink-root { --b-surface:#fcfcfb; --b-ink:#0b0b0b; --b-ink2:#52514e; --b-muted:#898781;
   --b-border:rgba(11,11,11,0.10); --b-good:#0ca30c; --b-warning:#fab219; --b-critical:#d03b3b;
@@ -355,6 +375,8 @@ def main():
         server_port=args.port,
         share=args.share,
         css=CSS,
+        theme=THEME,
+        favicon_path=FAVICON,
         js="() => { document.body.classList.remove('dark'); }",
         max_file_size=MAX_UPLOAD,
     )

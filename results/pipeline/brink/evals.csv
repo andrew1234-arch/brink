@@ -1,3 +1,3 @@
-step,asr,asr_keyword,n,judge,asr_hi,n_hi,over_refusal,heldout_loss,redteam_jailbreak,redteam_encoding,redteam_prompt_injection,redteam_refusal,redteam_attack_resistance
-0,0.15625,0.21875,64,wildguard,0.020833333333333332,48,0.0,2.1022118878710687,1.0,0.8,0.625,1.0,0.8095238095238095
-128,0.0625,0.0625,64,wildguard,0.0,48,0.0,1.8004187848063706,0.875,0.8,0.625,1.0,0.7619047619047619
+step,asr,asr_keyword,n,judge,asr_hi,n_hi,over_refusal,heldout_loss,task_chrf,seconds_per_reply,redteam_jailbreak,redteam_encoding,redteam_prompt_injection,redteam_refusal,redteam_attack_resistance
+0,0.15625,0.21875,64,wildguard,0.020833333333333332,48,0.0,2.1022118878710687,32.25322727401876,0.602804645895958,0.75,0.8,0.25,1.0,0.5714285714285714
+128,0.0625,0.0625,64,wildguard,0.0,48,0.0,1.8004019979123476,31.421786935954557,0.6063989512622356,0.5,0.8,0.5,1.0,0.5714285714285714

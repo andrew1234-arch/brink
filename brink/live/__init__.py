@@ -41,7 +41,7 @@ from brink.live.data import LiveData, build_live_data
 from brink.live.manager import MODEL_LOCK, LiveManager
 from brink.live.pipeline import report, run_live
 from brink.live.status import LiveStopped, Status, read_status
-from brink.live.upload import fingerprint_for, gate_pairs, read_pairs
+from brink.live.upload import fingerprint_for, gate_pairs, read_pairs, write_gate_files
 
 __all__ = [
     "CPU_MODEL",
@@ -68,4 +68,5 @@ __all__ = [
     "read_status",
     "report",
     "run_live",
+    "write_gate_files",
 ]
