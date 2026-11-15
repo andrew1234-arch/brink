@@ -21,8 +21,16 @@ sys.path.insert(0, str(ROOT))
 
 from brink.io import stage_finished
 
-STAGES = ["go_nogo", "pipeline", "live", "gate", "repair", "multilingual"]  # most important first
-HOURS_T4X2 = {"go_nogo": 2.7, "gate": 1.5, "repair": 2.7, "multilingual": 2.0, "pipeline": 1.5, "live": 0.4}
+STAGES = ["go_nogo", "pipeline", "live", "gate", "repair", "multilingual", "circuit"]  # most important first
+HOURS_T4X2 = {
+    "go_nogo": 2.7,
+    "gate": 1.5,
+    "repair": 2.7,
+    "multilingual": 2.0,
+    "pipeline": 1.5,
+    "live": 0.4,
+    "circuit": 0.6,
+}
 
 
 def done(stage: str, results: Path) -> bool:
@@ -54,9 +62,9 @@ def main() -> int:
         cfg = f"configs/{stage}.yaml"
         t0 = time.time()
         print(f"\n{'=' * 80}\n{stage}\n{'=' * 80}", flush=True)
-        # `live` (Brink end to end) validates its own model and data as its first stages.
+        # `live` validates its own model and data as its first stages; `circuit` needs `pip install circuitkit`.
         preflight = [sys.executable, "experiments/preflight.py", "--config", cfg]
-        if stage != "live" and not args.skip_preflight and run(preflight) != 0:
+        if stage not in ("live", "circuit") and not args.skip_preflight and run(preflight) != 0:
             status[stage] = "skipped: preflight failed"
             continue
         rc = run([sys.executable, f"experiments/{stage}.py", "--config", cfg, "--out", f"{args.results}/{stage}"])

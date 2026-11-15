@@ -1,0 +1,12 @@
+# Stage "circuit": CircuitKIT discovers Tiny Aya's refusal circuit; Brink checks it against the layer it monitors.
+# Needs go / no-go's fingerprint (results/go_nogo/fingerprint.*). Experimental: CircuitKIT's Tiny Aya support is
+# marked experimental upstream. About 20-40 min on one T4.
+model_id: CohereLabs/tiny-aya-global
+fingerprint: results/go_nogo/fingerprint
+harmful_source: {name: walledai/AdvBench, split: train, column: prompt}
+n_examples: 32
+batch_size: 1
+algorithm: eap-ig
+ig_steps: 5
+dtype: float16             # T4 has no fast bfloat16
+seed: 0

@@ -58,6 +58,7 @@ eval:
   over_refusal_max_new_tokens: 64
   batch_size: 16
   loss_batch_size: 4
+  task_chrf_max_new_tokens: 128   # task quality: chrF of replies vs references on the held-out Hindi set (0 = off)
   redteam: true
   cheap_judge: {n: 16, max_new_tokens: 32, batch_size: 16}
 

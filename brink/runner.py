@@ -12,7 +12,7 @@ import torch
 
 from brink.data import Pair, tokenize_sft
 from brink.eval.behavioral import evaluate_behavior, evaluate_over_refusal
-from brink.eval.capability import heldout_loss
+from brink.eval.capability import heldout_loss, task_chrf
 from brink.io import calibrated_threshold
 from brink.monitor import Monitor
 from brink.probe import Prober, SafetyFingerprint, calibrate
@@ -65,9 +65,11 @@ def behaviour_evaluator(
     max_len: int = 1024,
     loss_batch_size: int = 4,
     over_refusal_max_new_tokens: int | None = None,
+    task_quality_max_new_tokens: int | None = None,
 ):
     """The behavioural check every monitored run uses: attack success on held-out harmful prompts, plus
-    over-refusal on harmless prompts and held-out task loss when those sets are given.
+    over-refusal on harmless prompts and held-out task loss when those sets are given, and the task-reply
+    quality (chrF against the references) when task_quality_max_new_tokens is set.
     Returns evaluator(model) -> (metrics, per-prompt records)."""
 
     def evaluator(m):
@@ -78,6 +80,8 @@ def behaviour_evaluator(
             )
         if heldout:
             metrics["heldout_loss"] = heldout_loss(m, tok, heldout, max_len, loss_batch_size)
+            if task_quality_max_new_tokens:
+                metrics["task_chrf"] = task_chrf(m, tok, heldout, task_quality_max_new_tokens, batch_size)
         return metrics, records
 
     return evaluator

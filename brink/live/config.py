@@ -97,6 +97,8 @@ class LiveConfig:
     bootstrap: int = 100
     n_tokens: int = 10
     guard_refresh_every: int = 8
+    redteam: bool = True  # AuditKIT red-team probes on the base, unprotected and Brink models (if installed)
+    task_quality: bool = True  # chrF of task replies vs references on the held-out task data
     seed: int = 0
     sources: dict = field(default_factory=lambda: dict(SOURCES))
 

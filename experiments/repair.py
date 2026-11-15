@@ -66,13 +66,13 @@ def make_evaluator(tok, data: RepairData, judge, cfg: dict):
     )
 
 
-def final_redteam(model, tok, cdir: Path, cfg: dict) -> None:
+def final_redteam(model, tok, cdir: Path, cfg: dict, judge=None) -> None:
     """AuditKIT red-team probes on the final model, if enabled and installed."""
     if not cfg["eval"].get("redteam", True):
         return
     try:
         res = auditkit_redteam(
-            model, tok, max_new_tokens=cfg["eval"]["max_new_tokens"], batch_size=cfg["eval"]["batch_size"]
+            model, tok, max_new_tokens=cfg["eval"]["max_new_tokens"], batch_size=cfg["eval"]["batch_size"], judge=judge
         )
     except ImportError:
         res = {"skipped": "auditkit not installed"}
@@ -129,7 +129,7 @@ def train_condition(name: str, out_dir: Path, fp, loader, data: RepairData, judg
     )
     summary = {**ctl.summary(), "train_seconds": round(time.time() - t0, 1)}
     write_json(cdir / "repair.json", summary)
-    final_redteam(model, tok, cdir, cfg)
+    final_redteam(model, tok, cdir, cfg, judge)
     # Adapters stay local (git-ignored). `none` is the drifted model the post-hoc conditions repair; the
     # Brink-protected ones can be published with scripts/publish_hub.py --adapters <condition>.
     model.save_pretrained(str(cdir / "adapter"))
@@ -162,7 +162,7 @@ def posthoc_condition(name: str, out_dir: Path, fp, loader, data: RepairData, ju
         with ReferenceSteer(model, fp, strength):
             sig = prober(model)
             metrics, _ = evaluator(model)
-            final_redteam(model, tok, cdir, cfg)
+            final_redteam(model, tok, cdir, cfg, judge)
     elif name == "posthoc_resta":
         rs = rc["resta"]
         model = resta(
@@ -176,7 +176,7 @@ def posthoc_condition(name: str, out_dir: Path, fp, loader, data: RepairData, ju
         info.update(alpha=rs["alpha"], base_id=rs["base_id"])
         sig = prober(model)
         metrics, _ = evaluator(model)
-        final_redteam(model, tok, cdir, cfg)
+        final_redteam(model, tok, cdir, cfg, judge)
     else:
         raise ValueError(name)
     info["repair_seconds"] = round(time.time() - t0, 1)

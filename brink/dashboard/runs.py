@@ -130,3 +130,21 @@ def read_rows_any(path: Path) -> list[dict]:
             for r in csv.DictReader(f)
             if None not in r and all(v is not None for v in r.values())
         ]
+
+
+STAGE_ORDER = ["go_nogo", "gate", "repair", "multilingual", "pipeline", "live", "circuit"]
+
+
+def stage_reports(root: Path) -> str:
+    """Every finished stage's REPORT.md (plus ROI.md when present) as one Markdown page, in programme order."""
+    root = Path(root)
+    if not root.is_dir():
+        return "No results yet."
+    stages = sorted(
+        (p for p in root.iterdir() if p.is_dir() and (p / "REPORT.md").exists()),
+        key=lambda p: (STAGE_ORDER.index(p.name) if p.name in STAGE_ORDER else len(STAGE_ORDER), p.name),
+    )
+    parts = [f"<!-- {p.name} -->\n" + (p / "REPORT.md").read_text().strip() for p in stages]
+    if (root / "ROI.md").exists():
+        parts.append((root / "ROI.md").read_text().strip())
+    return "\n\n---\n\n".join(parts) if parts else "No finished stages yet."

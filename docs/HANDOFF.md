@@ -1,6 +1,6 @@
 # Handoff: where Brink stands and what's left
 
-Read this first. It is the single source of truth for picking the project up. Last updated 2026-11-11.
+Read this first. It is the single source of truth for picking the project up. Last updated 2026-11-12.
 
 ## 1. The goal
 
@@ -109,21 +109,33 @@ Gotchas:
 - transformers 5 records `hidden_states` before user hooks run. The steering code measures with a forward
   pre-hook on layer l* for that reason.
 
-## 6. Status (2026-11-06)
+## 6. Status (2026-11-12)
 
 | Area | State |
 |---|---|
-| Library, 6 stages, app, CI, Space deploy pipeline, docs | **Done.** Tested offline; CI green on `main` |
+| Library, 7 stages, app, CI, Space deploy pipeline, docs | **Done.** Tested offline; CI green on `main` |
 | Real GPU runs | **Running** since 2026-11-12 09:15 UTC: Kaggle `cmgdevl/brink-run-all`, all stages, 11 h session budget, expected to finish around 20:00 UTC. go_nogo `pos_s0` on Tiny Aya: ASR 16 % → 98 %, S3 at −11.6σ by step 4, WildGuard judge working. The first attempt failed in every stage on Kaggle's torchao 0.10 (fixed: the notebook uninstalls it) |
 | Kaggle GPU quota | **30 h / week** since Nov 12 (it was 6 h until then); resets Fridays 00:00 UTC |
 | HF Space | **Not deployed.** `HF_SPACE_ID` isn't set, so the deploy job is skipped |
 | Write-up numbers | 7 `⟦RESULT⟧` markers in `docs/SUBMISSION.md`; README says "Results: pending" |
+| Rubric scorecard | `docs/SCORECARD.md`: requirements and problem statements from hackathon.lexsi.ai, scored. **Re-score it at each milestone and on Nov 13** |
+| Branch `rubric-gaps` | **Merged into `main` on 2026-11-12, after the 09:15 session had cloned `main`.** Closes scorecard gaps: CuratorKIT + AuditKIT inside *Run Brink* and *Gate your data*; the AuditKIT scoring fix; chrF task-quality metric; CircuitKIT stage (`circuit`, last in the notebook); ROI calculator; public dataset repo + HF collection in `publish_hub.py`; `docs/ABSTRACT.md`, `docs/ARTICLE.md`, `docs/CIRCUIT.md` |
+| What the 2026-11-12 session can't give | It runs the pre-merge code: no `circuit` stage, no chrF in pipeline, and **wrong AuditKIT red-team numbers in pipeline and repair** (see Step 2). Next session (quota resets Fri Nov 13 00:00 UTC): run `circuit`, and re-run pipeline after removing `results/pipeline` from `results/all` (finished stages are skipped) |
+| Repo About | Set on 2026-11-12 with `gh repo edit` (description + 12 topics). Website is empty until the Space is deployed |
 
 **Critical path:** run the experiments → check and fix → fill in the numbers → deploy → submit by Nov 14.
 
+**Rules that change the plan** (hackathon.lexsi.ai, read 2026-11-06):
+- Projects "must be deployed publicly". All models, adapters, logs and datasets must be in a public, un-gated HF
+  collection.
+- The write-up is an HF Article (`docs/ARTICLE.md`), plus an abstract under 500 words (`docs/ABSTRACT.md`).
+- Only Track 2 repos count toward the "chain at least 2 repos from your track" rule (CuratorKIT, SafeTune,
+  CircuitKIT, AuditKIT). AlignTune is a Track 1 repo.
+- There are 5 prizes overall, across all tracks.
+
 ## 7. What's left, step by step
 
-### Step 1: run the experiments on Kaggle (6 GPU-hours left before the deadline: one session)
+### Step 1: run the experiments on Kaggle (session 1 running on Nov 12; session 2 on Nov 13 for `circuit` and the pipeline re-run)
 
 1. On Hugging Face, with the account whose token you'll use, accept the terms of:
    `CohereLabs/tiny-aya-global`, `CohereLabs/tiny-aya-base`, `allenai/wildguard`, `walledai/AdvBench`,
@@ -137,9 +149,9 @@ Gotchas:
 5. **Save Version → Save & Run All (Commit)**. Each stage runs preflight, runs, then pushes its results to the
    `results/all` branch. Re-run the notebook in a new session to continue; finished stages are skipped.
 6. Order (most important first) and time: go_nogo (2 seeds) 2.7 h → pipeline 1.5 h (the required real use
-   case) → live 0.4 h | gate 1.5 h → repair 2.7 h → multilingual 2 h (only if quota is left).
-   `SESSION_BUDGET_H = 5.5` stops a session from starting a stage the quota can't finish; in-progress results
-   are pushed every 20 min. One 6 h session covers go_nogo, pipeline and live.
+   case) → live 0.4 h → gate 1.5 h → repair 2.7 h → multilingual 2 h → circuit 0.6 h (installs CircuitKIT,
+   so it runs last). `SESSION_BUDGET_H = 11.0` stops a session from starting a stage that can't finish before
+   Kaggle's 12 h limit; in-progress results are pushed every 20 min. All seven stages take 11.4 h: two sessions.
    go_nogo matters most: it decides whether the core claim holds, and it calibrates the alarm the later stages
    use.
 
@@ -162,6 +174,11 @@ back to the keyword judge.
 For each stage, read `results/<stage>/REPORT.md` and `summary.json` on the `results/all` branch. Pass
 criteria are in each experiment doc: `docs/GO_NOGO.md` ("Pass criteria (all must hold for GO)"),
 `docs/GATE.md`, `docs/REPAIR.md`, `docs/MULTILINGUAL.md` and `docs/PIPELINE.md`.
+- **AuditKIT numbers from runs on the old `main` are wrong.** Before the `rubric-gaps` merge (2026-11-12),
+  `brink/eval/audit.py` used AuditKIT's default detectors, which score a refusal as a failed attack: a model
+  that refuses everything got 0 % attack resistance. Don't quote `redteam_*` / "AuditKIT attacks resisted" from
+  any stage that ran on the old code: pipeline and repair in the 2026-11-12 09:15 session. WildGuard ASR is
+  unaffected. See `docs/UPSTREAM.md`.
 - If go/no-go says NO-GO, don't hide it. Read the report's failing criterion and decide whether it's a bug, a
   sizing issue (steps, learning rate, contamination) or a real negative result. The write-up states
   limitations up front.
@@ -178,6 +195,9 @@ criteria are in each experiment doc: `docs/GO_NOGO.md` ("Pass criteria (all must
 
 ### Step 3: fill in the numbers
 
+- Run `python scripts/headlines.py --fill docs/ABSTRACT.md`. It writes `results/HEADLINES.md` (every headline number
+  with its source file and key) and fills the abstract's named markers, listing any it can't fill. Copy numbers
+  into the other docs from `HEADLINES.md`.
 - `docs/SUBMISSION.md`: replace every `⟦RESULT⟧` (lines ~47-51 and the video script, ~line 126) with numbers
   from the `summary.json` files. Every number must trace back to a file in `results/`.
 - `README.md`: replace "**Results:** pending the GPU runs…" (~line 116) with a short results table: before
@@ -217,12 +237,20 @@ python scripts/publish_hub.py --repo <hf-username>/brink-artifacts              
 ```
 
 ```bash
-python scripts/publish_hub.py --repo <hf-username>/brink-artifacts --yes --adapters rollback_guard
+python scripts/publish_hub.py --repo <hf-username>/brink-artifacts --dataset-repo <hf-username>/brink-results \
+    --space <hf-username>/brink --collection "Brink" --yes --adapters rollback_guard brink
 ```
+
+The hackathon requires the collection and every repo in it to be public, so don't pass `--private`.
 
 This publishes fingerprints, summaries, reports, plots and CSV logs, plus Brink-protected adapters by name.
 It refuses drifted adapters and replies. Adapters exist only on the machine that trained them, so on Kaggle
 run this at the end of the session, or the adapters are lost when it ends.
+
+### Step 5b: ROI
+
+Fill in the prices in `configs/roi.yaml`, each with its source and date, then run `python scripts/roi.py`. It
+reads the serving speed measured in stage 04 and writes `results/ROI.md`.
 
 ### Step 6: submit (by Nov 14)
 
@@ -232,10 +260,13 @@ run this at the end of the session, or the adapters are lost when it ends.
   baselines), AuditKIT (red-team probes).
 - Demo Day (Nov 22) script and 2-minute video script: `docs/SUBMISSION.md`. Start *Run Brink* on the GPU Space
   about 10 minutes before presenting, with the recorded run as the fallback.
-- Repo About (set by hand on GitHub; the API was blocked):
-  - description "Catch LLM safety collapse during fine-tuning, before it happens: gate, monitor, repair.
-    Built on Tiny Aya and the Lexsi stack.";
-  - topics `ai-safety`, `alignment`, `fine-tuning`, `llm`, `interpretability`, `lora`, `cohere`, `huggingface`.
+- Repo About (set on 2026-11-12 with `gh repo edit`):
+  - description "Stops fine-tuning from breaking an LLM's safety: gates risky training data, watches refusal
+    while it trains, rolls back before behaviour breaks. Built on Tiny Aya + Lexsi toolkits.";
+  - topics `ai-safety`, `alignment`, `fine-tuning`, `llm`, `lora`, `interpretability`, `red-teaming`, `cohere`,
+    `tiny-aya`, `huggingface`, `gradio`, `pytorch`;
+  - still to do: once the Space is deployed, set Website with
+    `gh repo edit andrew1234-arch/brink --homepage https://huggingface.co/spaces/<hf-username>/brink`.
 
 ## 8. Where things are configured
 

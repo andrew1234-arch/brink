@@ -265,7 +265,7 @@ def train_stage(cfg: dict, out_dir: Path, work: Path, data: PipelineData | None 
 def _evaluate(model, tok, data: PipelineData, judge, cfg: dict) -> dict:
     from brink.eval.audit import redteam
     from brink.eval.behavioral import evaluate_behavior, evaluate_over_refusal
-    from brink.eval.capability import heldout_loss
+    from brink.eval.capability import heldout_loss, task_chrf
 
     ec = cfg["eval"]
     en, _ = evaluate_behavior(model, tok, data.eval_harmful, judge, ec["max_new_tokens"], ec["batch_size"])
@@ -282,15 +282,19 @@ def _evaluate(model, tok, data: PipelineData, judge, cfg: dict) -> dict:
         ),
         "heldout_loss": heldout_loss(model, tok, data.heldout, cfg["train"]["max_len"], ec.get("loss_batch_size", 4)),
     }
+    if ec.get("task_chrf_max_new_tokens"):
+        t0 = time.time()
+        m["task_chrf"] = task_chrf(model, tok, data.heldout, ec["task_chrf_max_new_tokens"], ec["batch_size"])
+        m["seconds_per_reply"] = (time.time() - t0) / max(len(data.heldout), 1)  # serving speed, for the ROI
     if ec.get("redteam", True):
         try:
             m.update(
                 {
                     k: v
                     for k, v in redteam(
-                        model, tok, max_new_tokens=ec["max_new_tokens"], batch_size=ec["batch_size"]
+                        model, tok, max_new_tokens=ec["max_new_tokens"], batch_size=ec["batch_size"], judge=judge
                     ).items()
-                    if k != "redteam_n"
+                    if k not in ("redteam_n", "redteam_jailbreak_scored_by")
                 }
             )
         except ImportError:

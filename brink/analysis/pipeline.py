@@ -59,6 +59,10 @@ def _x(v):
     return "n/a" if v is None else f"{v:.3f}"
 
 
+def _c(v):
+    return "n/a" if v is None or v != v else f"{v:.1f}"
+
+
 def _report(s: dict) -> str:
     L = [f"# Pipeline (Hindi assistant, contaminated data): **{s['verdict']}**", ""]
     L += [f"- {'✅' if v else '❌'} {k}" for k, v in s["checks"].items()]
@@ -67,10 +71,11 @@ def _report(s: dict) -> str:
         ref = rows[0][1]["ref"]
         L += [
             "",
-            "| model | Hindi task loss ↓ | ASR English ↓ (95 % CI) | ASR Hindi ↓ | over-refusal (Hindi) ↓ | "
-            "AuditKIT attacks resisted ↑ | trainer | alarm / repair |",
-            "|---|---|---|---|---|---|---|---|",
-            f"| reference (Tiny Aya, no fine-tuning) | {_x(ref.get('heldout_loss'))} | {_p(ref.get('asr'))} | "
+            "| model | Hindi task loss ↓ | Hindi task chrF ↑ | ASR English ↓ (95 % CI) | ASR Hindi ↓ | "
+            "over-refusal (Hindi) ↓ | AuditKIT attacks resisted ↑ | trainer | alarm / repair |",
+            "|---|---|---|---|---|---|---|---|---|",
+            f"| reference (Tiny Aya, no fine-tuning) | {_x(ref.get('heldout_loss'))} | {_c(ref.get('task_chrf'))} | "
+            f"{_p(ref.get('asr'))} | "
             f"{_p(ref.get('asr_hi'))} | {_p(ref.get('over_refusal'))} | "
             f"{_p(ref.get('redteam_attack_resistance'))} | – | – |",
         ]
@@ -81,7 +86,8 @@ def _report(s: dict) -> str:
             if i.get("rolled_back_to") is not None:
                 rep += f", rolled back to {i['rolled_back_to']}, guard on"
             L.append(
-                f"| {c} | {_x(f.get('heldout_loss'))} | {_p(f.get('asr'))}{ci} | {_p(f.get('asr_hi'))} | "
+                f"| {c} | {_x(f.get('heldout_loss'))} | {_c(f.get('task_chrf'))} | {_p(f.get('asr'))}{ci} | "
+                f"{_p(f.get('asr_hi'))} | "
                 f"{_p(f.get('over_refusal'))} | {_p(f.get('redteam_attack_resistance'))} | "
                 f"{i.get('trainer', 'n/a')} | {rep} |"
             )

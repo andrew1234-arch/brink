@@ -120,11 +120,12 @@ trainer.train()
 | 03 | [multilingual](docs/MULTILINGUAL.md) | Does English fine-tuning erode safety in Hindi and Tagalog, and does English-only monitoring miss it? |
 | 04 | [pipeline](docs/PIPELINE.md) | Does the full Lexsi pipeline deliver a safe, useful Hindi assistant from contaminated data? |
 | live | [end to end](docs/DASHBOARD.md#run-brink-end-to-end-live) | The whole product on Tiny Aya in one run: gate, monitor, repair, verify (recorded for the Space) |
+| circuit | [CircuitKIT](docs/CIRCUIT.md) | Does CircuitKIT's refusal circuit sit where Brink reads refusal? (experimental) |
 
 **Run everything:**
 - **Kaggle:** [`notebooks/kaggle_run_all.ipynb`](notebooks/kaggle_run_all.ipynb). It saves results after
   every stage and resumes across sessions.
-- **Any GPU machine:** `make run-all`. About 12 h on a T4 x2 in total.
+- **Any GPU machine:** `make run-all`. About 13 h on a T4 x2 in total.
 
 Each experiment writes a `REPORT.md` with an explicit verdict, and the dashboard reads every run.
 
@@ -134,10 +135,16 @@ Each experiment writes a `REPORT.md` with an explicit verdict, and the dashboard
 
 | Toolkit | Role |
 |---|---|
-| **CuratorKIT** | `BrinkSafetyGate`, a native `BaseGate`; the pipeline experiment runs a full CuratorKIT pipeline |
-| **AlignTune** | Training in the pipeline experiment, with Brink attached through its TRL backend |
-| **SafeTune** | Post-hoc baselines: ReSta, and steering along the fingerprint's pre-drift direction |
-| **AuditKIT** | Red-team probes on every final model, with attack resistance and over-refusal reported separately |
+Hackathon entry: **Track 2b (AI Safety and Correction)**, problem statement **#5 Safety-preserving fine-tuning**,
+also #9 (locating where safety lives) and 2a #4 (multilingual safety). See [docs/ABSTRACT.md](docs/ABSTRACT.md).
+
+| Toolkit | Role |
+|---|---|
+| **CuratorKIT** | `BrinkSafetyGate`, a native `BaseGate`. *Run Brink* and the pipeline experiment gate data through a CuratorKIT pipeline (`ExactDeduplicator` → `BrinkSafetyGate`) |
+| **AuditKIT** | Red-team probes on the base model and every final model, in *Run Brink* and the experiments; attack resistance and over-refusal reported separately |
+| **SafeTune** | The repair baselines Brink is measured against: ReSta, and steering along the fingerprint's pre-drift direction |
+| **CircuitKIT** | Discovers Tiny Aya's refusal circuit; checks that Brink monitors the layer the circuit writes into; its `safety_units` are SafeTune-readable |
+| **AlignTune** (Track 1) | Training in the pipeline experiment, with Brink attached through its TRL backend |
 
 Issues found while integrating are written up in [docs/UPSTREAM.md](docs/UPSTREAM.md).
 
