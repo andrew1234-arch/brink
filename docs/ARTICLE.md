@@ -1,12 +1,3 @@
----
-title: "Brink: catching a model's safety collapsing during fine-tuning, and stopping it"
-authors:
-  - user: cmgdevl
----
-
-<!-- The Hugging Face Article (the hackathon write-up). Publish at https://huggingface.co/new-blog.
-     Every number comes from results/*/summary.json; results/HEADLINES.md traces each to its file and key. -->
-
 # Brink: catching a model's safety collapsing during fine-tuning, and stopping it
 
 **One line:** one refusal measure gates the training data, raises an alarm while the model trains, and repairs

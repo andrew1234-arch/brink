@@ -11,6 +11,9 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+**Hackathon write-up:** [docs/ARTICLE.md](docs/ARTICLE.md) (Lexsi AI Safety & Alignment Hackathon,
+Track 2b). Abstract and form answers: [docs/ABSTRACT.md](docs/ABSTRACT.md).
+
 **Brink stops fine-tuning from breaking a model's safety.** It drops the training data that would erode the
 model's refusals, watches the refusals while the model trains, and rolls training back as soon as they start to
 slip.
