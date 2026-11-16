@@ -1,0 +1,35 @@
+{
+  "requests_per_month": 1000000,
+  "input_tokens": 400,
+  "output_tokens": 128,
+  "seconds_per_reply": 0.6063989512622356,
+  "closed_api": {
+    "model": "gpt-6-luna",
+    "per_1k_usd": 0.104,
+    "monthly_usd": 104.0,
+    "price_source": "https://developers.openai.com/api/docs/pricing (standard tier, read 2026-11-16)"
+  },
+  "other_apis": [
+    {
+      "model": "gpt-6.1-terra",
+      "per_1k_usd": 1.0399999999999998,
+      "monthly_usd": 1040.0,
+      "price_source": "https://developers.openai.com/api/docs/pricing (standard tier, read 2026-11-16)"
+    }
+  ],
+  "self_hosted": {
+    "model": "CohereLabs/tiny-aya-global + Brink adapter",
+    "gpu": "NVIDIA T4 16 GB",
+    "per_1k_usd": 0.08422207656419939,
+    "gpu_hours_per_month": 168.4441531283988,
+    "gpus_needed": 1,
+    "monthly_usd": 360.0,
+    "one_off_fine_tune_usd": 0.8,
+    "price_source": "https://huggingface.co/pricing (Inference Endpoints, NVIDIA T4 on AWS, read 2026-11-16)"
+  },
+  "monthly_saving_usd": -256.0,
+  "payback_months": null,
+  "cost_ratio": 0.28888888888888886,
+  "per_1k_ratio": 1.2348306316185949,
+  "break_even_requests_per_month": 3461538.461538462
+}

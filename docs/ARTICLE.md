@@ -130,6 +130,9 @@ are the baselines Brink is compared with. Feedback for each toolkit: `docs/UPSTR
 ## Models and licences
 
 - **Base model:** `CohereLabs/tiny-aya-global`, 3.35B, LoRA r 16, α 32, dropout 0.05. Licence: as on its model card (CC-BY-NC 4.0).
+- **Published adapter:** the Brink-protected Hindi assistant, a LoRA on the base model, in
+  `cmgdevl/brink-artifacts` under `adapters/pipeline/brink/`. Licence: CC-BY-NC 4.0, as the base model. Brink's
+  code is MIT.
 - **Judge:** `allenai/wildguard` in 4-bit on the second GPU.
 - **No teacher model and no closed-model baseline.**
 
@@ -271,8 +274,24 @@ A cheap judge checking at every probe step fires 4 steps later.
 
 All runs used Kaggle's free GPU T4 x2: about 13 GPU-session hours for the five experiments plus the recorded
 run (go / no-go 3.2 h, gate 2.4 h, repair 3.5 h, multilingual 2.3 h, pipeline 1.6 h). Cost: $0. One full probe
-(5 signals, 128 prompts) takes 23.8 s; a cheap-judge check takes 6.2 s. A closed-model cost comparison
-(`scripts/roi.py`) is implemented but needs a serving-speed measurement that these runs don't include.
+(5 signals, 128 prompts) takes 23.8 s; a cheap-judge check takes 6.2 s.
+
+**Cost per 1,000 replies vs a closed API.** The Hindi use case measured 0.61 s per reply for the Brink-protected
+Tiny Aya on one T4 (batched, greedy, up to 128 new tokens, plain `transformers` generation). At $0.50 per T4
+hour (Hugging Face Inference Endpoints) and 400 input / 128 output tokens per reply (`scripts/roi.py`,
+`results/ROI.md`; prices read 2026-11-16):
+
+| Model | Per 1,000 replies |
+|---|---|
+| Brink-protected Tiny Aya, self-hosted on a T4 (GPU kept busy) | $0.084 |
+| gpt-6-luna (OpenAI's cheapest current model) | $0.104 |
+| gpt-6.1-terra | $1.040 |
+
+A kept-busy T4 costs less per reply than the cheapest closed model and about a twelfth of a mid-tier one. An
+always-on GPU costs $360 a month, so it only beats gpt-6-luna above about 3.5 million replies a month; below
+that, the reason to self-host is control over the weights and the data, not price. The Brink fine-tune itself
+costs about $0.80 (1.6 T4-hours). A serving engine such as vLLM would lower the self-hosted cost further; we
+didn't measure it.
 
 ## Limitations
 
@@ -303,6 +322,8 @@ run (go / no-go 3.2 h, gate 2.4 h, repair 3.5 h, multilingual 2.3 h, pipeline 1.
 - **Product page (Space):** https://huggingface.co/spaces/cmgdevl/brink
 - **Protected adapter and fingerprints:** https://huggingface.co/cmgdevl/brink-artifacts
 - **Logs and reports:** https://huggingface.co/datasets/cmgdevl/brink-results
+- **Model collection:** https://huggingface.co/collections/cmgdevl/brink-models-6afa95609e091281b4d637e4
+- **Dataset collection:** https://huggingface.co/collections/cmgdevl/brink-datasets-6afa95617e17226835cb29ec
 
 ## Documentation and reproduction
 

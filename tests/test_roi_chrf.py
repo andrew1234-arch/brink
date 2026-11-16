@@ -43,9 +43,23 @@ def test_roi_arithmetic():
     assert r["self_hosted"]["gpu_hours_per_month"] == pytest.approx(100_000 * 0.5 / 3600)
     assert r["self_hosted"]["monthly_usd"] == pytest.approx(720 * 0.5)
     assert r["monthly_saving_usd"] == pytest.approx(-80) and r["payback_months"] is None
-    assert "never" in report(r)
+    assert "no payback" in report(r)
     r2 = roi(_cfg(api_out=50.0), seconds_per_reply=0.5)
     assert r2["monthly_saving_usd"] > 0 and r2["payback_months"] == pytest.approx(1.0 / r2["monthly_saving_usd"])
+
+
+def test_roi_per_thousand_replies_and_other_apis():
+    cfg = _cfg()
+    cfg["also_compare"] = [{"model": "big", "usd_per_m_input": 4.0, "usd_per_m_output": 20.0, "source": "s"}]
+    r = roi(cfg, seconds_per_reply=0.5)
+    assert r["closed_api"]["per_1k_usd"] == pytest.approx(1000 * (400 * 2 + 200 * 10) / 1e6)
+    assert r["self_hosted"]["per_1k_usd"] == pytest.approx(1000 * 0.5 / 3600 * 0.5)
+    assert r["other_apis"][0]["per_1k_usd"] == pytest.approx(2 * r["closed_api"]["per_1k_usd"])
+    per_reply = r["closed_api"]["per_1k_usd"] / 1000
+    assert r["break_even_requests_per_month"] == pytest.approx(720 * 0.5 / per_reply)
+    assert "big" in report(r) and "Per 1,000 replies" in report(r)
+    slow = roi(_cfg(gpu=500.0), seconds_per_reply=0.5)
+    assert slow["break_even_requests_per_month"] is None and "costs more per reply" in report(slow)
 
 
 def test_measured_speed_is_read_from_the_last_eval(tmp_path):

@@ -128,7 +128,7 @@ trainer.train()
 - **CuratorKIT:** add `BrinkSafetyGate(GateScorer(...), drop_frac=0.05)` as a step in a `curatorkit.Pipeline`.
 - **A model Brink already protected:** the Hindi assistant's LoRA adapter is on the Hub,
   [`cmgdevl/brink-artifacts`](https://huggingface.co/cmgdevl/brink-artifacts)
-  (`subfolder="adapters/_work/pipeline/adapters/brink"`), on top of `CohereLabs/tiny-aya-global`.
+  (`subfolder="adapters/pipeline/brink"`), on top of `CohereLabs/tiny-aya-global`.
 
 ## Experiments
 
@@ -186,6 +186,10 @@ Each experiment writes a `REPORT.md` with an explicit verdict, and the dashboard
 
 Hackathon entry: **Track 2b (AI Safety and Correction)**, problem statement **#5 Safety-preserving fine-tuning**,
 also #9 (locating where safety lives) and 2a #4 (multilingual safety). Write-up: [docs/ARTICLE.md](docs/ARTICLE.md).
+On the Hub: the [model collection](https://huggingface.co/collections/cmgdevl/brink-models-6afa95609e091281b4d637e4)
+(the protected adapter and fingerprints) and the
+[dataset collection](https://huggingface.co/collections/cmgdevl/brink-datasets-6afa95617e17226835cb29ec) (every
+experiment's reports and logs).
 
 | Toolkit | Role |
 |---|---|

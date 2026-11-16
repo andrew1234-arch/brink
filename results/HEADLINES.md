@@ -57,7 +57,7 @@ shown.
 | `circuit.spearman` | — | not yet |
 | `circuit.peak_block` | — | not yet |
 | `circuit.brink_layer` | — | not yet |
-| `roi.self_hosted_monthly` | — | not yet |
-| `roi.api_monthly` | — | not yet |
-| `roi.api_model` | — | not yet |
+| `roi.self_hosted_monthly` | 360 | results/roi.json → self_hosted.monthly_usd |
+| `roi.api_monthly` | 104 | results/roi.json → closed_api.monthly_usd |
+| `roi.api_model` | gpt-6-luna | results/roi.json → closed_api.model |
 | `roi.payback_months` | — | not yet |

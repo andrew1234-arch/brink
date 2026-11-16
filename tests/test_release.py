@@ -95,7 +95,7 @@ def test_pipeline_layout_and_work_dir(tmp_path):
     (r / "_work" / "pipeline" / "raw.jsonl").write_text('{"instruction": "x"}\n')
     (r / "_work" / "pipeline" / "manifest.json").write_text("{}")
     files = collect(r, tmp_path / "stage", ["brink"])
-    assert any("adapters/brink/" in f for f in files)
+    assert "adapters/pipeline/brink/adapter_model.safetensors" in files
     assert not any("/naive/" in f for f in files)
     assert not any(f.endswith(("raw.jsonl", "manifest.json")) for f in files)
 
@@ -173,3 +173,19 @@ def test_product_page_demo_replays_the_recorded_run(tmp_path):
     page = render(tmp_path / "results", ["live"])
     assert "window.BRINK_DEMO" in page and 'id="alarm-chart"' in page and "90 % → 20 %" in page
     assert demo_data(tmp_path / "nothing") is None and "BRINK_DEMO =" not in render(tmp_path / "nothing", [])
+
+
+def test_hub_model_card_and_collections(tmp_path):
+    from scripts.publish_hub import collection_plan, model_card
+
+    r = _fake_results(tmp_path)
+    card = model_card("u/brink-artifacts", r, "u/brink-results")
+    assert "license: cc-by-nc-4.0" in card and "base_model: CohereLabs/tiny-aya-global" in card
+    assert 'PeftModel.from_pretrained(base, "u/brink-artifacts", subfolder="adapters/pipeline/brink")' in card
+    assert "https://huggingface.co/datasets/u/brink-results" in card
+    plan = collection_plan("Brink", "u/brink-artifacts", "u/brink-results", "u/brink")
+    assert plan == {
+        "Brink: models": [("u/brink-artifacts", "model"), ("u/brink", "space")],
+        "Brink: datasets": [("u/brink-results", "dataset"), ("u/brink", "space")],
+    }
+    assert collection_plan("Brink", "u/a", None, None) == {"Brink": [("u/a", "model")]}

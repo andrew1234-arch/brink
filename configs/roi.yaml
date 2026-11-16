@@ -1,17 +1,22 @@
 traffic:
   requests_per_month: 1000000
   input_tokens: 400
-  output_tokens: 200
+  output_tokens: 128
 closed_api:
-  model: "<closed model name>"
-  usd_per_m_input: 0.0
-  usd_per_m_output: 0.0
-  source: "<pricing page URL, read YYYY-MM-DD>"
+  model: gpt-6-luna
+  usd_per_m_input: 0.10
+  usd_per_m_output: 0.50
+  source: "https://developers.openai.com/api/docs/pricing (standard tier, read 2026-11-16)"
+also_compare:
+  - model: gpt-6.1-terra
+    usd_per_m_input: 1.00
+    usd_per_m_output: 5.00
+    source: "https://developers.openai.com/api/docs/pricing (standard tier, read 2026-11-16)"
 self_hosted:
   model: CohereLabs/tiny-aya-global + Brink adapter
   gpu: NVIDIA T4 16 GB
-  usd_per_gpu_hour: 0.0
+  usd_per_gpu_hour: 0.50
   min_hours_per_month: 720
-  fine_tune_gpu_hours: 1.5
-  source: "<GPU pricing page URL, read YYYY-MM-DD>"
+  fine_tune_gpu_hours: 1.6
+  source: "https://huggingface.co/pricing (Inference Endpoints, NVIDIA T4 on AWS, read 2026-11-16)"
 pipeline_results: results/pipeline

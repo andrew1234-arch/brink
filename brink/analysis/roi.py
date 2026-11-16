@@ -21,23 +21,48 @@ def measured_seconds_per_reply(pipeline_dir: Path, condition: str = "brink") -> 
     return float(v) if v not in (None, "") else None
 
 
+def _api_usd_per_reply(traffic: dict, api: dict) -> float:
+    return (traffic["input_tokens"] * api["usd_per_m_input"] + traffic["output_tokens"] * api["usd_per_m_output"]) / 1e6
+
+
 def roi(cfg: dict, seconds_per_reply: float) -> dict:
     t, api, gpu = cfg["traffic"], cfg["closed_api"], cfg["self_hosted"]
     n = t["requests_per_month"]
-    api_cost = n * (t["input_tokens"] * api["usd_per_m_input"] + t["output_tokens"] * api["usd_per_m_output"]) / 1e6
+    api_per_reply = _api_usd_per_reply(t, api)
+    api_cost = n * api_per_reply
     gpu_hours = n * seconds_per_reply / 3600
     hours = max(gpu_hours, gpu.get("min_hours_per_month", 0))
     n_gpus = max(1, math.ceil(gpu_hours / (30 * 24))) if gpu_hours else 1
     self_cost = hours * gpu["usd_per_gpu_hour"]
+    self_per_1k = 1000 * seconds_per_reply / 3600 * gpu["usd_per_gpu_hour"]
     one_off = gpu["fine_tune_gpu_hours"] * gpu["usd_per_gpu_hour"]
     monthly_saving = api_cost - self_cost
+    always_on = gpu.get("min_hours_per_month", 0) * gpu["usd_per_gpu_hour"]
+    others = [
+        {
+            "model": o["model"],
+            "per_1k_usd": 1000 * _api_usd_per_reply(t, o),
+            "monthly_usd": n * _api_usd_per_reply(t, o),
+            "price_source": o["source"],
+        }
+        for o in cfg.get("also_compare", [])
+    ]
     return {
         "requests_per_month": n,
+        "input_tokens": t["input_tokens"],
+        "output_tokens": t["output_tokens"],
         "seconds_per_reply": seconds_per_reply,
-        "closed_api": {"model": api["model"], "monthly_usd": api_cost, "price_source": api["source"]},
+        "closed_api": {
+            "model": api["model"],
+            "per_1k_usd": 1000 * api_per_reply,
+            "monthly_usd": api_cost,
+            "price_source": api["source"],
+        },
+        "other_apis": others,
         "self_hosted": {
             "model": gpu["model"],
             "gpu": gpu["gpu"],
+            "per_1k_usd": self_per_1k,
             "gpu_hours_per_month": gpu_hours,
             "gpus_needed": n_gpus,
             "monthly_usd": self_cost,
@@ -47,26 +72,55 @@ def roi(cfg: dict, seconds_per_reply: float) -> dict:
         "monthly_saving_usd": monthly_saving,
         "payback_months": (one_off / monthly_saving) if monthly_saving > 0 else None,
         "cost_ratio": (api_cost / self_cost) if self_cost else None,
+        "per_1k_ratio": (1000 * api_per_reply / self_per_1k) if self_per_1k else None,
+        "break_even_requests_per_month": (always_on / api_per_reply) if api_per_reply > self_per_1k / 1000 else None,
     }
 
 
 def report(r: dict) -> str:
     a, s = r["closed_api"], r["self_hosted"]
-    payback = "never" if r["payback_months"] is None else f"{r['payback_months']:.2f} months"
+    payback_line = (
+        "no payback at this traffic"
+        if r["payback_months"] is None
+        else f"pays back in {r['payback_months']:.2f} months"
+    )
     ratio = "n/a" if r["cost_ratio"] is None else f"{r['cost_ratio']:.1f}×"
     hosted = f"{s['model']} on {s['gpu']} ({s['gpu_hours_per_month']:,.0f} GPU-h, {s['gpus_needed']} GPU)"
+    rows = [
+        f"| Closed API | {o['model']} | ${o['per_1k_usd']:.3f} | ${o['monthly_usd']:,.0f} |"
+        for o in [a, *r["other_apis"]]
+    ]
+    rows.append(f"| Self-hosted | {hosted} | ${s['per_1k_usd']:.3f} | ${s['monthly_usd']:,.0f} |")
+    be = r["break_even_requests_per_month"]
+    break_even = (
+        f"- An always-on GPU beats {a['model']} above **{be:,.0f} requests a month**."
+        if be
+        else f"- The self-hosted model costs more per reply than {a['model']} at this speed."
+    )
+    saving = r["monthly_saving_usd"]
+    monthly = (
+        f"- At this traffic, self-hosting saves **${saving:,.0f} a month** against {a['model']} ({ratio} cheaper)."
+        if saving > 0
+        else f"- At this traffic, the always-on GPU costs **${-saving:,.0f} a month more** than {a['model']}."
+    )
+    sources = [f"{a['model']}: {a['price_source']}"] + [f"{o['model']}: {o['price_source']}" for o in r["other_apis"]]
+    sources.append(f"GPU: {s['price_source']}")
     return f"""# ROI: closed API vs Brink-protected Tiny Aya
 
-{r["requests_per_month"]:,} requests a month. Serving speed measured in experiment 04:
-{r["seconds_per_reply"]:.2f} s per reply on the evaluation GPU (batched, greedy).
+{r["requests_per_month"]:,} requests a month of {r["input_tokens"]} input and {r["output_tokens"]} output tokens.
+Serving speed measured in experiment 04: {r["seconds_per_reply"]:.2f} s per reply on the evaluation GPU
+(batched, greedy, plain `transformers` generation; a serving engine such as vLLM would be faster). The per-1k
+cost of the self-hosted model assumes the GPU is kept busy; the monthly cost counts an always-on GPU.
 
-| | Model | Monthly cost |
-|---|---|---|
-| Closed API | {a["model"]} | ${a["monthly_usd"]:,.0f} |
-| Self-hosted | {hosted} | ${s["monthly_usd"]:,.0f} |
+| | Model | Per 1,000 replies | Monthly cost |
+|---|---|---|---|
+{chr(10).join(rows)}
 
-- Monthly saving: **${r["monthly_saving_usd"]:,.0f}** ({ratio} cheaper).
-- One-off fine-tune with Brink: ${s["one_off_fine_tune_usd"]:,.2f}; pays back in {payback}.
+- Per 1,000 replies, {a["model"]} costs {"n/a" if r["per_1k_ratio"] is None else f"{r['per_1k_ratio']:.1f}×"} as much
+  as the self-hosted model.
+{monthly}
+{break_even}
+- One-off fine-tune with Brink: ${s["one_off_fine_tune_usd"]:,.2f}; {payback_line}.
 
-Prices: API from {a["price_source"]}; GPU from {s["price_source"]}.
+Prices: {"; ".join(sources)}.
 """

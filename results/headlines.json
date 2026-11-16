@@ -238,5 +238,20 @@
   "value": 0.8857142857142857,
   "text": "89 %",
   "source": "results/live/summary.json → loss_prevented"
+ },
+ "roi.self_hosted_monthly": {
+  "value": 360.0,
+  "text": "360",
+  "source": "results/roi.json → self_hosted.monthly_usd"
+ },
+ "roi.api_monthly": {
+  "value": 104.0,
+  "text": "104",
+  "source": "results/roi.json → closed_api.monthly_usd"
+ },
+ "roi.api_model": {
+  "value": "gpt-6-luna",
+  "text": "gpt-6-luna",
+  "source": "results/roi.json → closed_api.model"
  }
 }

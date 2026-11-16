@@ -28,21 +28,62 @@ PROTECTED = {"rollback_guard", "guard_always", "guard", "rollback", "brink"}
 ALLOWED = {".csv", ".json", ".md", ".png"}
 
 CARD = """---
-license: mit
-tags: [ai-safety, alignment, fine-tuning, interpretability, aya]
+license: cc-by-nc-4.0
+base_model: CohereLabs/tiny-aya-global
+library_name: peft
+tags: [ai-safety, alignment, fine-tuning, interpretability, aya, lora]
 ---
 
 # Brink artifacts
 
-Fingerprints and experiment results from **Brink**, which detects and prevents LLM safety collapse during
+Fingerprints and Brink-protected adapters from **Brink**, which detects and prevents LLM safety collapse during
 fine-tuning (Lexsi AI Safety & Alignment Hackathon 2026). Code: https://github.com/andrew1234-arch/brink
-
+{headline}
+- `adapters/<experiment>/<condition>/`: LoRA adapters for `CohereLabs/tiny-aya-global` from Brink-protected runs
+  only. `adapters/pipeline/brink/` is the Hindi assistant fine-tuned on contaminated data with Brink on (data
+  gate, monitor, rollback and erosion guard).
 - `fingerprints/`: per-model (and per-language) refusal directions, monitored layer, refusal / compliance
   first tokens and baseline statistics (`.pt` + `.json`).
-- `results/`: every experiment's report, summary, plots and CSV logs.
+- Results, reports and logs: {results}
+
+```python
+from peft import PeftModel
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+tok = AutoTokenizer.from_pretrained("CohereLabs/tiny-aya-global")
+base = AutoModelForCausalLM.from_pretrained("CohereLabs/tiny-aya-global", dtype="auto", device_map="auto")
+model = PeftModel.from_pretrained(base, "{repo}", subfolder="adapters/pipeline/brink")
+```
+
+**Licence:** the adapters and fingerprints are derived from `CohereLabs/tiny-aya-global` and follow its licence,
+CC-BY-NC 4.0 (non-commercial). Brink's code is MIT.
 
 Model replies to harmful prompts and deliberately drifted adapters are not published.
 """
+
+
+def pipeline_headline(results: Path) -> str:
+    """One line with the Hindi use case's before / after attack success, from results/pipeline/summary.json."""
+    import json
+
+    f = results / "pipeline" / "summary.json"
+    if not f.exists():
+        return ""
+    c = json.loads(f.read_text()).get("conditions", {})
+    try:
+        before, naive, brink = c["naive"]["ref"]["asr"], c["naive"]["final"]["asr"], c["brink"]["final"]["asr"]
+    except KeyError:
+        return ""
+    return (
+        f"\n**Headline:** fine-tuning Tiny Aya as a Hindi assistant on data with 10 % harmful samples raised English"
+        f" attack success from {before:.0%} to {naive:.0%}; with Brink it ended at {brink:.0%}"
+        f" (`pipeline/summary.json`).\n"
+    )
+
+
+def model_card(repo: str, results: Path, dataset_repo: str | None = None) -> str:
+    where = f"https://huggingface.co/datasets/{dataset_repo}" if dataset_repo else "`results/` in this repo"
+    return CARD.format(headline=pipeline_headline(results), results=where, repo=repo)
 
 
 DATASET_CARD = """---
@@ -64,7 +105,7 @@ Only rates, scores and labels are published. Model replies to harmful prompts ar
 """
 
 
-def split_release(stage: Path) -> tuple[Path, Path]:
+def split_release(stage: Path, card: str = "") -> tuple[Path, Path]:
     """Split a staged release into (model folder: fingerprints, adapters; dataset folder: results)."""
     model, data = stage / "_model", stage / "_dataset"
     model.mkdir(), data.mkdir()
@@ -73,7 +114,7 @@ def split_release(stage: Path) -> tuple[Path, Path]:
             shutil.move(str(stage / name), model / name)
     if (stage / "results").exists():
         shutil.move(str(stage / "results"), data / "results")
-    (model / "README.md").write_text(CARD)
+    (model / "README.md").write_text(card or (stage / "README.md").read_text())
     (data / "README.md").write_text(DATASET_CARD)
     return model, data
 
@@ -95,7 +136,8 @@ def collect(results: Path, stage: Path, adapters: list[str]) -> list[str]:
             )
             if cond not in adapters:
                 continue
-            dst = stage / "adapters" / rel
+            run = [p for p in rel.parts if p != "_work"]
+            dst = stage / "adapters" / run[0] / cond / rel.name
         elif "_work" in parts:
             continue
         elif f.suffix in ALLOWED:
@@ -105,7 +147,7 @@ def collect(results: Path, stage: Path, adapters: list[str]) -> list[str]:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(f, dst)
         files.append(str(dst.relative_to(stage)))
-    (stage / "README.md").write_text(CARD)
+    (stage / "README.md").write_text(model_card("<repo>", results))
     return sorted(files)
 
 
@@ -118,7 +160,11 @@ def main():
     )
     ap.add_argument("--dataset-repo", default=None, help="put results and logs in this dataset repo")
     ap.add_argument("--space", default=None, help="Space to add to the collection, e.g. user/brink")
-    ap.add_argument("--collection", default=None, help="title of the public collection gathering everything")
+    ap.add_argument(
+        "--collection",
+        default=None,
+        help="title of the public collections: with --dataset-repo, '<title>: models' and '<title>: datasets'",
+    )
     ap.add_argument("--private", action="store_true", help="NOT allowed for the hackathon submission")
     ap.add_argument("--yes", action="store_true", help="actually upload (default: dry run)")
     args = ap.parse_args()
@@ -138,9 +184,11 @@ def main():
     from huggingface_hub import HfApi
 
     api = HfApi()
+    card = model_card(args.repo, Path(args.results), args.dataset_repo)
+    (stage / "README.md").write_text(card)
     items = [(args.repo, "model")]
     if args.dataset_repo:
-        model_dir, data_dir = split_release(stage)
+        model_dir, data_dir = split_release(stage, card)
         api.create_repo(args.dataset_repo, repo_type="dataset", private=args.private, exist_ok=True)
         api.upload_folder(folder_path=str(data_dir), repo_id=args.dataset_repo, repo_type="dataset")
         print(f"uploaded to https://huggingface.co/datasets/{args.dataset_repo}")
@@ -150,11 +198,22 @@ def main():
     api.create_repo(args.repo, repo_type="model", private=args.private, exist_ok=True)
     api.upload_folder(folder_path=str(model_dir), repo_id=args.repo, repo_type="model")
     print(f"uploaded to https://huggingface.co/{args.repo}")
-    if args.space:
-        items.append((args.space, "space"))
     if args.collection:
-        namespace = args.repo.split("/")[0]
-        col = api.create_collection(args.collection, namespace=namespace, private=args.private, exists_ok=True)
+        publish_collections(api, args.collection, args.repo, args.dataset_repo, args.space, args.private)
+
+
+def collection_plan(title: str, repo: str, dataset_repo: str | None, space: str | None) -> dict[str, list]:
+    """The hackathon asks for a model collection and a dataset collection; the Space goes in both."""
+    extra = [(space, "space")] if space else []
+    if not dataset_repo:
+        return {title: [(repo, "model"), *extra]}
+    return {f"{title}: models": [(repo, "model"), *extra], f"{title}: datasets": [(dataset_repo, "dataset"), *extra]}
+
+
+def publish_collections(api, title: str, repo: str, dataset_repo: str | None, space: str | None, private: bool):
+    namespace = repo.split("/")[0]
+    for name, items in collection_plan(title, repo, dataset_repo, space).items():
+        col = api.create_collection(name, namespace=namespace, private=private, exists_ok=True)
         for item_id, kind in items:
             api.add_collection_item(col.slug, item_id=item_id, item_type=kind, exists_ok=True)
         print(f"collection: https://huggingface.co/collections/{col.slug} ({len(items)} items)")
